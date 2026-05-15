@@ -1,0 +1,75 @@
+'use client'
+
+import Link from 'next/link'
+import { productUrl } from '@/lib/product-slug'
+
+interface Product {
+  id: string
+  slug?: string | null
+  name: string
+  price: number
+  image_url: string
+  stock: number
+  sales_count?: number
+  is_best_seller?: boolean
+}
+
+interface ProductCardProps {
+  product: Product
+}
+
+export function ProductCard({ product }: ProductCardProps) {
+  const isOutOfStock = product.stock === 0
+  const isLowStock = product.stock > 0 && product.stock <= 5
+
+  return (
+    <Link href={productUrl(product)} className="group">
+      <div className="bg-card rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        {/* Product Image */}
+        <div className="relative w-full aspect-square overflow-hidden bg-accent">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-foreground/30">
+              No image
+            </div>
+          )}
+
+          {/* Badges */}
+          <div className="absolute top-3 right-3 flex flex-col gap-2">
+            {isLowStock && !isOutOfStock && (
+              <span
+                className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: '#f97316' }}
+              >
+                Only {product.stock} left
+              </span>
+            )}
+            {isOutOfStock && (
+              <span
+                className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: '#6b7280' }}
+              >
+                Sold Out
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Product Info */}
+        <div className="p-4">
+          <h3 className="font-semibold text-foreground line-clamp-2 mb-2">
+            {product.name}
+          </h3>
+          <p className="text-sm text-primary font-bold">
+            ${parseFloat(product.price.toString()).toFixed(2)}
+          </p>
+        </div>
+      </div>
+    </Link>
+  )
+}

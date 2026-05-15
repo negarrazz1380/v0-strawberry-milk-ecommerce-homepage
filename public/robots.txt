@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /account/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /success/
+Disallow: /cancel/
+Disallow: /track-order/
+
+Sitemap: https://www.casekisses.com/sitemap.xml
