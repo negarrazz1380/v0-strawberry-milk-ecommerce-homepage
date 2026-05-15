@@ -12,7 +12,7 @@ export function Hero() {
               Pick Your Personality
             </span>
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-foreground leading-tight text-balance">
-              Girly, Aesthetic Phone Cases That Match Your Vibe 💖
+              Girly, Aesthetic Phone Cases That Match Your Vibe
             </h1>
             <p className="text-base text-muted-foreground leading-relaxed max-w-md mx-auto md:mx-0 text-pretty">
               Cute, trendy, and unique designs made to stand out.
