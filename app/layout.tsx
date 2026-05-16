@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, DM_Serif_Display, Sarina, Dancing_Script, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { CartDrawer } from '@/components/cart-drawer'
+import { TiktokPixel } from '@/components/TiktokPixel'
 import './globals.css'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
@@ -67,6 +68,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable} ${sarina.variable} ${dancingScript.variable} ${playfairDisplay.variable} bg-background`}>
       <body className="font-sans antialiased">
+        <TiktokPixel />
         {children}
         <CartDrawer />
         {process.env.NODE_ENV === 'production' && <Analytics />}
