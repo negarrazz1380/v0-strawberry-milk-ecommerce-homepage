@@ -49,6 +49,13 @@ export function ProductPageClient({ productId }: ProductPageClientProps) {
 
       setProduct(data)
       setLoading(false)
+
+      window.ttq?.track('ViewContent', {
+        contents: [{ content_id: data.id, content_name: data.name }],
+        content_type: 'product',
+        value: data.price,
+        currency: 'CAD',
+      })
     }
 
     fetchProduct()
@@ -184,6 +191,12 @@ export function ProductPageClient({ productId }: ProductPageClientProps) {
                       image_url: product.image_url,
                       device_model: selectedModel || undefined,
                       is_preorder: isPreorder,
+                    })
+                    window.ttq?.track('AddToCart', {
+                      contents: [{ content_id: product.id, content_name: product.name }],
+                      content_type: 'product',
+                      value: product.price,
+                      currency: 'CAD',
                     })
                     setTimeout(() => setAdding(false), 300)
                   }}

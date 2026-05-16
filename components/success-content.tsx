@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/hooks/use-cart'
 import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
@@ -18,6 +18,22 @@ export function SuccessContent() {
   const sessionId = searchParams.get('session_id')
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const paymentTracked = useRef(false)
+
+  // Fire the TikTok CompletePayment event once per confirmed order, after the
+  // order lookup settles so we can include the real total when available.
+  useEffect(() => {
+    if (!sessionId || loading || paymentTracked.current) return
+    paymentTracked.current = true
+    window.ttq?.track('CompletePayment', {
+      contents: orderInfo
+        ? [{ content_id: orderInfo.order_number, content_name: 'Order' }]
+        : undefined,
+      content_type: 'product',
+      value: orderInfo?.total,
+      currency: 'CAD',
+    })
+  }, [sessionId, loading, orderInfo])
 
   useEffect(() => {
     if (!sessionId) {
