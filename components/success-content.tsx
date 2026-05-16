@@ -19,21 +19,25 @@ export function SuccessContent() {
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const paymentTracked = useRef(false)
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const clearCartRef = useRef(clearCart)
+  clearCartRef.current = clearCart
 
-  // Fire the TikTok CompletePayment event once per confirmed order, after the
-  // order lookup settles so we can include the real total when available.
+  // Fire the TikTok CompletePayment event exactly once, and ONLY when the
+  // order was actually confirmed with a valid numeric total — never when the
+  // order lookup failed or is still pending.
   useEffect(() => {
-    if (!sessionId || loading || paymentTracked.current) return
+    if (paymentTracked.current || !sessionId || !orderInfo) return
+    const total = Number(orderInfo.total)
+    if (!Number.isFinite(total)) return
     paymentTracked.current = true
     window.ttq?.track('CompletePayment', {
-      contents: orderInfo
-        ? [{ content_id: orderInfo.order_number, content_name: 'Order' }]
-        : undefined,
+      contents: [{ content_id: orderInfo.order_number, content_name: 'Order' }],
       content_type: 'product',
-      value: orderInfo?.total,
+      value: total,
       currency: 'CAD',
     })
-  }, [sessionId, loading, orderInfo])
+  }, [sessionId, orderInfo])
 
   useEffect(() => {
     if (!sessionId) {
@@ -41,20 +45,27 @@ export function SuccessContent() {
       return
     }
 
-    clearCart()
+    // Clear the cart once, on return from a successful payment. clearCart is
+    // read through a ref so its unstable identity can't re-run this effect or
+    // spawn duplicate retry chains.
+    clearCartRef.current()
 
     // Fetch real order number by session ID — retry a few times since the
     // webhook may not have fired yet when Stripe redirects back
+    let cancelled = false
     let attempts = 0
     const maxAttempts = 6
     const delay = 1500
 
     const fetchOrder = async () => {
+      if (cancelled) return
       attempts++
       try {
         const res = await fetch(`/api/order-by-session?session_id=${sessionId}`)
+        if (cancelled) return
         if (res.ok) {
           const data = await res.json()
+          if (cancelled) return
           setOrderInfo(data)
           setLoading(false)
           return
@@ -63,16 +74,24 @@ export function SuccessContent() {
         // ignore fetch error, will retry
       }
 
+      if (cancelled) return
+
       if (attempts < maxAttempts) {
-        setTimeout(fetchOrder, delay)
+        timeoutsRef.current.push(setTimeout(fetchOrder, delay))
       } else {
         // Give up — show without order number
         setLoading(false)
       }
     }
 
-    setTimeout(fetchOrder, 1000)
-  }, [sessionId, clearCart])
+    timeoutsRef.current.push(setTimeout(fetchOrder, 1000))
+
+    return () => {
+      cancelled = true
+      timeoutsRef.current.forEach(clearTimeout)
+      timeoutsRef.current = []
+    }
+  }, [sessionId])
 
   if (!sessionId) {
     return (

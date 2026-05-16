@@ -60,6 +60,36 @@ export async function POST(request: NextRequest) {
 
     const checkoutCustomerId = customerData?.id
 
+    // Never trust client-supplied prices — look up the real price for every
+    // product server-side and use that when building the Stripe line items.
+    const productIds = [...new Set(items.map((item: any) => item.id))]
+    const { data: dbProducts, error: priceError } = await supabase
+      .from('products')
+      .select('id, price')
+      .in('id', productIds)
+
+    if (priceError) {
+      console.error('[checkout] Price lookup error:', priceError)
+      return NextResponse.json(
+        { error: 'Failed to verify product prices' },
+        { status: 500 }
+      )
+    }
+
+    const priceMap = new Map<string, number>()
+    for (const p of dbProducts ?? []) {
+      priceMap.set(p.id, Number(p.price))
+    }
+
+    for (const item of items) {
+      if (!priceMap.has(item.id)) {
+        return NextResponse.json(
+          { error: `Product not found: ${item.id}` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Convert cart items to Stripe line items
     // Also build a map of item images/models to pass in metadata (Stripe doesn't return these in listLineItems)
     const itemMetaMap: Record<string, string> = {}
@@ -74,6 +104,9 @@ export async function POST(request: NextRequest) {
       const displayName = item.device_model
         ? `${item.name} — ${item.device_model}`
         : item.name
+      // priceMap is guaranteed to contain item.id — every cart item was
+      // verified against the DB above (404 -> 400 otherwise).
+      const unitAmount = Math.round(priceMap.get(item.id)! * 100)
       return {
         price_data: {
           currency: 'usd',
@@ -81,7 +114,7 @@ export async function POST(request: NextRequest) {
             name: displayName,
             images: item.image_url ? [item.image_url] : undefined,
           },
-          unit_amount: Math.round(item.price * 100),
+          unit_amount: unitAmount,
         },
         quantity: item.quantity,
       }
@@ -113,8 +146,8 @@ export async function POST(request: NextRequest) {
         // Image URLs and model names keyed by item index (item_image_0, item_model_0, ...)
         ...itemMetaMap,
       },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/cancel`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://casekisses.com'}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://casekisses.com'}/cancel`,
     })
 
     return NextResponse.json({ url: session.url })
