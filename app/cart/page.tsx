@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/hooks/use-cart'
+import { cartItemKey } from '@/lib/cart-store'
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart, total } = useCart()
@@ -38,47 +39,53 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="flex gap-4 p-4 rounded-2xl bg-[#fbcfe8]/10"
-              >
-                {item.image_url && (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="w-24 h-24 object-cover rounded-xl"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
-                  <div className="flex items-center gap-2 mt-4">
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="px-3 py-1 rounded-lg hover:opacity-70"
-                      style={{ backgroundColor: '#fbcfe8' }}
-                    >
-                      -
-                    </button>
-                    <span className="px-4">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="px-3 py-1 rounded-lg hover:opacity-70"
-                      style={{ backgroundColor: '#fbcfe8' }}
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="ml-auto text-sm text-red-600 hover:underline"
-                    >
-                      Remove
-                    </button>
+            {items.map((item) => {
+              const key = cartItemKey(item)
+              return (
+                <div
+                  key={key}
+                  className="flex gap-4 p-4 rounded-2xl bg-[#fbcfe8]/10"
+                >
+                  {item.image_url && (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-24 h-24 object-cover rounded-xl"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg">{item.name}</h3>
+                    {item.device_model && (
+                      <p className="text-sm text-muted-foreground">{item.device_model}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
+                    <div className="flex items-center gap-2 mt-4">
+                      <button
+                        onClick={() => updateQuantity(key, item.quantity - 1)}
+                        className="px-3 py-1 rounded-lg hover:opacity-70"
+                        style={{ backgroundColor: '#fbcfe8' }}
+                      >
+                        -
+                      </button>
+                      <span className="px-4">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(key, item.quantity + 1)}
+                        className="px-3 py-1 rounded-lg hover:opacity-70"
+                        style={{ backgroundColor: '#fbcfe8' }}
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => removeItem(key)}
+                        className="ml-auto text-sm text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Cart Summary */}

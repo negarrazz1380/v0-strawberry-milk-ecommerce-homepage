@@ -54,7 +54,7 @@ export const useCartStore = create<CartStore>()(
       updateQuantity: (key, quantity) =>
         set((state) => ({
           items: state.items.map((i) =>
-            cartItemKey(i) === key ? { ...i, quantity: Math.max(0, quantity) } : i
+            cartItemKey(i) === key ? { ...i, quantity: Math.max(1, quantity) } : i
           ),
         })),
       clearCart: () => set({ items: [] }),
