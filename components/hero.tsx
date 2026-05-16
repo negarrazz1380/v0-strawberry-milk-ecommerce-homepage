@@ -35,7 +35,7 @@ export function Hero() {
             <div className="flex flex-wrap gap-4 justify-center md:justify-start mt-2">
               {[
                 "Easy returns",
-                "10,000+ happy customers",
+                "loved by cute girlies across Canada & USA 🎀",
               ].map((badge) => (
                 <span key={badge} className="text-xs text-muted-foreground flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
