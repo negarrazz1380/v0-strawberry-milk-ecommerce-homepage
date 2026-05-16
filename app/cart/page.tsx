@@ -3,52 +3,10 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/hooks/use-cart'
-import { useState } from 'react'
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart, total } = useCart()
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleCheckout = async () => {
-    try {
-      setError(null)
-      setLoading(true)
-
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        const errorMsg = data.details || data.error || 'Failed to create checkout session'
-        console.error('[checkout] API error:', errorMsg)
-        setError(errorMsg)
-        setLoading(false)
-        return
-      }
-
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        const errorMsg = 'No checkout URL returned from API'
-        console.error('[checkout]', errorMsg)
-        setError(errorMsg)
-        setLoading(false)
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred'
-      console.error('[checkout] Exception:', errorMsg)
-      setError(errorMsg)
-      setLoading(false)
-    }
-  }
 
   if (items.length === 0) {
     return (
@@ -140,19 +98,12 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {error && (
-                <div className="mb-4 p-3 rounded-lg bg-red-100 border border-red-400 text-red-700 text-sm">
-                  {error}
-                </div>
-              )}
-
               <button
-                onClick={handleCheckout}
-                disabled={loading}
-                className="w-full py-3 rounded-2xl font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                onClick={() => router.push('/checkout')}
+                className="w-full py-3 rounded-2xl font-bold text-white hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: '#ec4899' }}
               >
-                {loading ? 'Loading...' : 'Checkout'}
+                Checkout
               </button>
               <button
                 onClick={() => router.push('/')}
