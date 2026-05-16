@@ -67,6 +67,25 @@ export async function POST(request: Request) {
         }
       )
 
+      // Idempotency: Stripe delivers webhooks at-least-once and retries on any
+      // non-2xx response. If we've already recorded an order for this checkout
+      // session, skip order creation + email entirely and ack with 200 so
+      // Stripe stops retrying (prevents duplicate orders and emails).
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('stripe_session_id', session.id)
+        .maybeSingle()
+
+      if (existingOrder) {
+        console.log(
+          '[webhook] Order already exists for session',
+          session.id,
+          '- skipping duplicate'
+        )
+        return new Response('ok', { status: 200 })
+      }
+
       // Try to get full customer details using checkout_customer_id (preferred)
       let checkoutCustomer: any = null
       const checkoutCustomerId = session.metadata?.checkout_customer_id

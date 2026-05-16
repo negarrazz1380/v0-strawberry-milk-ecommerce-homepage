@@ -9,34 +9,17 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [noAccountError, setNoAccountError] = useState(false)
 
   async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccess(false)
-    setNoAccountError(false)
 
     try {
-      // First, check if email exists in profiles using server API
-      const checkResponse = await fetch('/api/auth/check-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-
-      const checkData = await checkResponse.json()
-
-      // If email doesn't exist, show error with sign-up option
-      if (!checkData.exists) {
-        setNoAccountError(true)
-        setEmail('')
-        setLoading(false)
-        return
-      }
-
-      // Email exists, proceed with password reset
+      // Always attempt the reset and show a generic confirmation. We must not
+      // reveal whether an account exists for this email (account-enumeration);
+      // Supabase's resetPasswordForEmail does not disclose this either.
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
@@ -52,7 +35,7 @@ export default function ForgotPasswordPage() {
       setEmail('')
       setLoading(false)
     } catch (err) {
-      console.error('[v0] Unexpected error:', err)
+      console.error('[forgot-password] Unexpected error:', err)
       setError('An unexpected error occurred. Please try again.')
       setLoading(false)
     }
@@ -105,36 +88,11 @@ export default function ForgotPasswordPage() {
                 Check your email!
               </p>
               <p className="text-xs text-green-600 mb-4">
-                We&apos;ve sent a password reset link to {email}. Check your inbox and follow the link to reset your password.
+                If an account exists for that email, we&apos;ve sent a password reset link. Check your inbox and follow the link to reset your password.
               </p>
               <Link href="/auth/login" className="text-sm font-semibold hover:underline" style={{ color: "#ec4899" }}>
                 Back to login
               </Link>
-            </div>
-          ) : noAccountError ? (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-              <p className="text-sm font-medium text-red-700 mb-3">
-                Account not found
-              </p>
-              <p className="text-xs text-red-600 mb-4">
-                You don&apos;t have an account with us. Please sign up first.
-              </p>
-              <div className="flex flex-col gap-2">
-                <Link 
-                  href="/auth/sign-up" 
-                  className="text-sm font-semibold rounded-2xl py-2 px-4 text-white transition-opacity hover:opacity-90"
-                  style={{ background: "linear-gradient(135deg, #ec4899, #f472b6)", display: "block" }}
-                >
-                  Sign up now
-                </Link>
-                <button
-                  onClick={() => setNoAccountError(false)}
-                  className="text-sm font-semibold hover:underline"
-                  style={{ color: "#ec4899" }}
-                >
-                  Try another email
-                </button>
-              </div>
             </div>
           ) : (
             <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
