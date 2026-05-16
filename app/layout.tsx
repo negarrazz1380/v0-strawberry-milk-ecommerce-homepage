@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, DM_Serif_Display, Sarina, Dancing_Script, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { CartDrawer } from '@/components/cart-drawer'
+import { EmailPopup } from '@/components/EmailPopup'
 import { TiktokPixel } from '@/components/TiktokPixel'
 import './globals.css'
 
@@ -71,6 +72,7 @@ export default function RootLayout({
         <TiktokPixel />
         {children}
         <CartDrawer />
+        <EmailPopup />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
