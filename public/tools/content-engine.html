@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Kisses Content Engine</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #fce7f3 0%, #fef3c7 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #be123c;
+        }
+        .header h1 { font-size: 32px; margin-bottom: 8px; font-weight: 600; }
+        .header p { color: #9f1239; font-size: 14px; }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 2px solid #fbcfe8;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .label {
+            display: block;
+            font-weight: 600;
+            color: #be123c;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        textarea, input[type="text"], select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #fbcfe8;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        textarea:focus, input:focus, select:focus {
+            outline: none;
+            border-color: #ec4899;
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
+        }
+        textarea { resize: vertical; min-height: 80px; }
+
+        button {
+            background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(236, 72, 153, 0.3); }
+        button:active { transform: translateY(0); }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #9f1239;
+            padding: 40px 20px;
+            font-size: 16px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 4px solid #fbcfe8;
+            border-top-color: #ec4899;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results { display: none; }
+        .result-section { margin-bottom: 28px; }
+        .result-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #be123c;
+            margin-bottom: 12px;
+        }
+
+        .result-content {
+            background: #fef3c7;
+            border-left: 4px solid #fbbf24;
+            padding: 16px;
+            border-radius: 8px;
+            line-height: 1.6;
+            color: #78350f;
+            font-size: 14px;
+        }
+
+        .copy-btn {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: #f59e0b; }
+        .copy-btn.copied { background: #10b981; color: white; }
+
+        .hashtag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .hashtag {
+            background: white;
+            border: 2px solid #fbcfe8;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            color: #ec4899;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .hashtag:hover { background: #fbcfe8; }
+
+        .alternatives {
+            background: #fce7f3;
+            padding: 16px;
+            border-radius: 10px;
+            margin-top: 16px;
+        }
+        .alt-title {
+            font-weight: 700;
+            color: #be123c;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        .alt-option {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #ec4899;
+            color: #7c2d12;
+            line-height: 1.5;
+            font-size: 13px;
+        }
+        .alt-option:last-child { margin-bottom: 0; }
+        .alt-option strong { color: #be123c; }
+
+        .tips {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 14px;
+            border-radius: 8px;
+            color: #1e3a8a;
+            font-size: 13px;
+            margin-top: 16px;
+            line-height: 1.6;
+        }
+
+        .reset-btn {
+            background: #e5e7eb;
+            color: #374151;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        .reset-btn:hover { background: #d1d5db; }
+
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid #fbbf24;
+            padding: 14px;
+            border-radius: 8px;
+            color: #78350f;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .error {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 14px;
+            border-radius: 8px;
+            color: #991b1b;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 { font-size: 24px; }
+            .card { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Case Kisses Content Engine</h1>
+            <p>From video to viral captions in 30 seconds</p>
+        </div>
+
+        <div class="card" id="formSection">
+            <form id="contentForm">
+                <div class="warning">
+                    Answer 3 quick questions and get captions, hashtags, sounds, and posting strategy tailored to your content.
+                </div>
+
+                <div class="error" id="errorBox"></div>
+
+                <div class="form-group">
+                    <label class="label">What product are you featuring?</label>
+                    <select id="product" required>
+                        <option value="">— Select a product —</option>
+                        <option value="Dog Polka Dot Case">Dog Polka Dot Case</option>
+                        <option value="Dachshund Lanyard">Dachshund Lanyard Case</option>
+                        <option value="Cocoa Teddy Case">Cocoa Teddy Case</option>
+                        <option value="Custom">Custom Product</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customProductGroup" style="display: none;">
+                    <label class="label">What's the case called?</label>
+                    <input type="text" id="customProduct" placeholder="e.g., Cherry Blossom case">
+                </div>
+
+                <div class="form-group">
+                    <label class="label">Which platform?</label>
+                    <select id="platform" required>
+                        <option value="">— Select platform —</option>
+                        <option value="TikTok">TikTok (fast cuts, trending audio)</option>
+                        <option value="Instagram Reels">Instagram Reels (carousel-friendly)</option>
+                        <option value="Both">Both TikTok & Instagram</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="label">Content type?</label>
+                    <select id="archetype" required>
+                        <option value="">— Select content type —</option>
+                        <option value="ASMR Unboxing">ASMR Unboxing (no voiceover, just sounds)</option>
+                        <option value="Coquette POV">Coquette POV (she asked me where I got...)</option>
+                        <option value="Collection Haul">Collection Haul/Flex (not gatekeeping...)</option>
+                        <option value="Honest Review">Honest Review (finally got it, obsessed...)</option>
+                        <option value="Dark Girly Aesthetic">Dark Girly Aesthetic (moody, mysterious)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="label">Any extra context? (optional)</label>
+                    <textarea id="context" placeholder="e.g., 'first order', 'the charm detail is insane', etc."></textarea>
+                </div>
+
+                <button type="submit">✨ Generate Strategy</button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                Analyzing your content and finding trending sounds...
+            </div>
+        </div>
+
+        <div class="card results" id="resultsSection">
+            <button class="reset-btn" onclick="resetForm()">← Try Another Video</button>
+
+            <div class="result-section">
+                <div class="result-title">Content Archetype</div>
+                <div id="archetypeResult" class="result-content"></div>
+            </div>
+
+            <div class="result-section">
+                <div class="result-title">Primary Caption</div>
+                <div id="captionResult" class="result-content">
+                    <div id="captionText"></div>
+                    <button class="copy-btn" onclick="copyToClipboard('captionText', this)">Copy Caption</button>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <div class="result-title">Hashtags (7-8 total)</div>
+                <div id="hashtagResult" class="result-content">
+                    <div class="hashtag-grid" id="nicheHashtags"></div>
+                    <button class="copy-btn" onclick="copyHashtags('nicheHashtags', this)" style="width: 100%;">Copy All Hashtags</button>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <div class="result-title">Sound & Posting Strategy</div>
+                <div id="soundResult" class="result-content"></div>
+            </div>
+
+            <div class="result-section">
+                <div class="result-title">Alternative Captions</div>
+                <div class="alternatives" id="alternativesResult"></div>
+            </div>
+
+            <div class="tips">
+                <strong>Pro tip:</strong> If engagement is lower than expected in first 6 hours, swap to an alternative caption by editing the post — TikTok re-indexes within 30 minutes.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Calls the site's own server-side route — never api.anthropic.com
+        // directly. The Anthropic API key lives on the server only.
+        const CONTENT_ENGINE_API = "/api/content-engine";
+
+        document.getElementById('product').addEventListener('change', function() {
+            document.getElementById('customProductGroup').style.display =
+                this.value === 'Custom' ? 'block' : 'none';
+        });
+
+        document.getElementById('contentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const product = document.getElementById('product').value === 'Custom'
+                ? document.getElementById('customProduct').value
+                : document.getElementById('product').value;
+            const platform = document.getElementById('platform').value;
+            const archetype = document.getElementById('archetype').value;
+            const context = document.getElementById('context').value;
+
+            if (!product.trim()) {
+                showError('Please select or describe your product');
+                return;
+            }
+
+            hideError();
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch(CONTENT_ENGINE_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product, platform, archetype, context })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate strategy');
+                }
+
+                displayResults(data);
+            } catch (error) {
+                document.getElementById('formSection').style.display = 'block';
+                document.getElementById('loading').style.display = 'none';
+                showError(error.message);
+            }
+        });
+
+        function showError(message) {
+            const box = document.getElementById('errorBox');
+            box.textContent = message;
+            box.style.display = 'block';
+        }
+
+        function hideError() {
+            const box = document.getElementById('errorBox');
+            box.textContent = '';
+            box.style.display = 'none';
+        }
+
+        function displayResults(result) {
+            document.getElementById('archetypeResult').innerHTML =
+                `<strong>${result.archetype}</strong><br><br>${result.why_works}`;
+
+            document.getElementById('captionText').textContent = result.caption;
+
+            const nicheContainer = document.getElementById('nicheHashtags');
+            nicheContainer.innerHTML = result.hashtags.map(tag =>
+                `<div class="hashtag">${tag}</div>`
+            ).join('');
+
+            document.getElementById('soundResult').innerHTML =
+                `<p><strong>Sound:</strong> ${result.sound}</p>
+                 <p style="margin-top: 12px;"><strong>Best posting times:</strong> ${result.best_times}</p>
+                 <p style="margin-top: 12px;"><strong>Platform hack:</strong> ${result.platform_tips}</p>`;
+
+            const altsHTML = `
+                <div style="margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #be123c;">Use these if first caption underperforms</div>
+                <div class="alt-option">
+                    <strong>Spicier version:</strong><br>
+                    ${result.alt_spicy}
+                </div>
+                <div class="alt-option">
+                    <strong>Softer version:</strong><br>
+                    ${result.alt_soft}
+                </div>
+                <div class="alt-option">
+                    <strong>First hour action:</strong><br>
+                    ${result.engagement_hook}
+                </div>
+                <div class="alt-option">
+                    <strong>Revenue play:</strong><br>
+                    ${result.revenue_angle}
+                </div>
+            `;
+
+            document.getElementById('alternativesResult').innerHTML = altsHTML;
+
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        function copyToClipboard(elementId, button) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                button.classList.add('copied');
+                button.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.textContent = 'Copy Caption';
+                }, 2000);
+            });
+        }
+
+        function copyHashtags(elementId, button) {
+            const tags = Array.from(document.getElementById(elementId).querySelectorAll('.hashtag'))
+                .map(el => el.textContent)
+                .join(' ');
+            navigator.clipboard.writeText(tags).then(() => {
+                button.classList.add('copied');
+                button.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.textContent = 'Copy All Hashtags';
+                }, 2000);
+            });
+        }
+
+        function resetForm() {
+            document.getElementById('contentForm').reset();
+            document.getElementById('customProductGroup').style.display = 'none';
+            document.getElementById('formSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+            hideError();
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
