@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Case Kisses Content Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Serif+Display&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --pink: #ec4899;
+    --pink-dark: #be123c;
+    --pink-soft: #fce7f3;
+    --pink-border: #fbcfe8;
+    --ink: #3f3f46;
+    --muted: #71717a;
+    --tiktok: #111827;
+    --instagram: #ec4899;
+    --both: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #fde7f3 0%, #fef3f9 45%, #fdf6e9 100%);
+    min-height: 100vh;
+    color: var(--ink);
+    padding: 24px 16px 96px;
+  }
+  h1, h2, h3 { font-family: "DM Serif Display", Georgia, serif; font-weight: 400; }
+
+  .container { max-width: 1240px; margin: 0 auto; }
+
+  header.page-head { text-align: center; margin-bottom: 22px; }
+  header.page-head h1 { font-size: 36px; color: var(--pink-dark); }
+  header.page-head p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+  .toolbar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .toolbar .range {
+    font-family: "DM Serif Display", serif;
+    font-size: 20px; color: var(--pink-dark); min-width: 240px; text-align: center;
+  }
+  button {
+    font-family: inherit; cursor: pointer; border: none;
+    border-radius: 999px; transition: all .15s ease;
+  }
+  .nav-btn {
+    background: #fff; color: var(--pink-dark);
+    border: 1.5px solid var(--pink-border);
+    padding: 9px 16px; font-size: 14px; font-weight: 500;
+  }
+  .nav-btn:hover { background: var(--pink-soft); }
+  .today-btn {
+    background: linear-gradient(135deg, var(--pink) 0%, #f43f5e 100%);
+    color: #fff; padding: 9px 18px; font-size: 14px; font-weight: 700;
+  }
+  .today-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(236,72,153,.3); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
+  .chip {
+    background: #fff; border: 1.5px solid var(--pink-border);
+    color: var(--pink-dark); padding: 7px 14px; font-size: 12px; font-weight: 600;
+  }
+  .chip:hover { background: var(--pink); color: #fff; border-color: var(--pink); }
+
+  .grid-scroll { overflow-x: auto; padding-bottom: 8px; }
+  .grid {
+    display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr));
+    gap: 10px; min-width: 980px;
+  }
+  .day-col { display: flex; flex-direction: column; gap: 8px; }
+  .day-head {
+    text-align: center; padding: 8px 4px; border-radius: 12px;
+    background: #fff; border: 1.5px solid var(--pink-border);
+  }
+  .day-head .dow { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .day-head .date { font-family: "DM Serif Display", serif; font-size: 17px; color: var(--ink); }
+  .day-head.is-today { background: var(--pink); border-color: var(--pink); }
+  .day-head.is-today .dow, .day-head.is-today .date { color: #fff; }
+
+  .slot {
+    border-radius: 12px; padding: 8px; min-height: 96px;
+    border: 1.5px solid transparent; display: flex; flex-direction: column;
+  }
+  .slot .slot-label { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; opacity: .7; margin-bottom: 6px; }
+  .tint-am  { background: #fef9c3; border-color: #fde68a; }
+  .tint-mid { background: #fce7f3; border-color: #fbcfe8; }
+  .tint-pm  { background: #ede9fe; border-color: #ddd6fe; }
+
+  .add-slot {
+    flex: 1; width: 100%; background: transparent;
+    border: 2px dashed rgba(0,0,0,.15); border-radius: 10px;
+    color: var(--muted); font-size: 13px; font-weight: 600; min-height: 60px;
+  }
+  .add-slot:hover { border-color: var(--pink); color: var(--pink); background: rgba(255,255,255,.5); }
+
+  .card {
+    position: relative; background: #fff; border-radius: 10px;
+    padding: 10px 10px 10px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    cursor: pointer; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  }
+  .card.pf-TikTok::before    { background: var(--tiktok); }
+  .card.pf-Instagram::before { background: var(--instagram); }
+  .card.pf-Both::before      { background: var(--both); }
+  .card .c-type { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .card .c-product { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .card .c-status {
+    display: inline-block; margin-top: 7px; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; background: var(--pink-soft); color: var(--pink-dark);
+  }
+  .card.is-posted .c-type,
+  .card.is-posted .c-product { text-decoration: line-through; }
+  .card.is-posted { opacity: .55; }
+
+  .card-actions {
+    position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
+    opacity: 0; transition: opacity .15s ease;
+  }
+  .card:hover .card-actions { opacity: 1; }
+  .card-actions button {
+    width: 24px; height: 24px; border-radius: 6px; font-size: 12px;
+    background: #fff; border: 1px solid var(--pink-border); color: var(--pink-dark);
+    display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
+  }
+  .card-actions button:hover { background: var(--pink); color: #fff; border-color: var(--pink); }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(40,10,30,.55);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 20px; width: 100%; max-width: 460px;
+    max-height: 90vh; overflow-y: auto; padding: 26px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal h2 { font-size: 22px; color: var(--pink-dark); margin-bottom: 2px; }
+  .modal .ctx { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 700; color: var(--pink-dark); margin-bottom: 6px; }
+  .field select, .field input, .field textarea {
+    width: 100%; padding: 10px 12px; font-family: inherit; font-size: 14px;
+    border: 1.5px solid var(--pink-border); border-radius: 10px; background: #fff; color: var(--ink);
+  }
+  .field select:focus, .field input:focus, .field textarea:focus {
+    outline: none; border-color: var(--pink); box-shadow: 0 0 0 3px rgba(236,72,153,.12);
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .btn-primary {
+    flex: 1; background: linear-gradient(135deg, var(--pink) 0%, #f43f5e 100%);
+    color: #fff; padding: 12px; font-size: 15px; font-weight: 700;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(236,72,153,.3); }
+  .btn-ghost { background: #f4f4f5; color: var(--ink); padding: 12px 18px; font-size: 15px; font-weight: 600; }
+  .btn-ghost:hover { background: #e4e4e7; }
+  .btn-danger { background: #fee2e2; color: #b91c1c; padding: 12px 18px; font-size: 15px; font-weight: 600; }
+  .btn-danger:hover { background: #fecaca; }
+
+  .detail-row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f4f4f5; font-size: 14px; }
+  .detail-row:last-of-type { border-bottom: none; }
+  .detail-row .k { font-weight: 700; color: var(--pink-dark); min-width: 92px; }
+  .detail-row .v { color: var(--ink); white-space: pre-wrap; word-break: break-word; flex: 1; }
+
+  .stats {
+    position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.92);
+    backdrop-filter: blur(8px); border-top: 1.5px solid var(--pink-border);
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 20px;
+    justify-content: center; align-items: center; z-index: 50;
+  }
+  .stat { text-align: center; }
+  .stat .num { font-family: "DM Serif Display", serif; font-size: 22px; color: var(--pink-dark); line-height: 1; }
+  .stat .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; }
+  .stat.divider { width: 1px; height: 28px; background: var(--pink-border); padding: 0; }
+  .pf-legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); align-items: center; }
+  .pf-legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.tt { background: var(--tiktok); }
+  .dot.ig { background: var(--instagram); }
+  .dot.bo { background: var(--both); }
+
+  @media (max-width: 640px) {
+    header.page-head h1 { font-size: 28px; }
+    .modal { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="page-head">
+    <h1>Case Kisses Content Calendar</h1>
+    <p>Plan your week of cute, viral content 🎀</p>
+  </header>
+
+  <div class="toolbar">
+    <button class="nav-btn" id="prevWeek">← Prev</button>
+    <button class="today-btn" id="todayBtn">Today</button>
+    <button class="nav-btn" id="nextWeek">Next →</button>
+    <div class="range" id="rangeLabel">—</div>
+  </div>
+
+  <div class="chips" id="quickChips"></div>
+
+  <div class="grid-scroll">
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<!-- Add / Edit modal -->
+<div class="overlay" id="formOverlay">
+  <div class="modal">
+    <h2 id="formTitle">Add content</h2>
+    <p class="ctx" id="formCtx"></p>
+    <form id="contentForm">
+      <div class="field">
+        <label for="f-platform">Platform</label>
+        <select id="f-platform" required></select>
+      </div>
+      <div class="field">
+        <label for="f-product">Product</label>
+        <select id="f-product" required></select>
+      </div>
+      <div class="field">
+        <label for="f-type">Content type</label>
+        <select id="f-type" required></select>
+      </div>
+      <div class="field">
+        <label for="f-caption">Caption / notes</label>
+        <textarea id="f-caption" placeholder="Hook, script idea, notes…"></textarea>
+      </div>
+      <div class="field">
+        <label for="f-sound">Sound / hashtags</label>
+        <input type="text" id="f-sound" placeholder="e.g. original sound · #casekisses #fyp" />
+      </div>
+      <div class="field">
+        <label for="f-status">Status</label>
+        <select id="f-status" required></select>
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Save</button>
+        <button type="button" class="btn-ghost" id="formCancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <h2>Content detail</h2>
+    <p class="ctx" id="detailCtx"></p>
+    <div id="detailBody"></div>
+    <div class="modal-actions" style="flex-wrap: wrap;">
+      <button type="button" class="btn-primary" id="detailPosted">Mark as posted</button>
+      <button type="button" class="btn-ghost" id="detailEdit">Edit</button>
+      <button type="button" class="btn-danger" id="detailDelete">Delete</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="detailClose" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "ck_calendar";
+  var PLATFORMS = ["TikTok", "Instagram", "Both"];
+  var PRODUCTS = ["Dog Polka Dot Case", "Dachshund Lanyard Case", "Cocoa Teddy Case", "Multi-case"];
+  var TYPES = [
+    "ASMR Unboxing", "Coquette POV", "Collection Haul", "Honest Review",
+    "Dark Girly Aesthetic", "The Heist", "Dog Goes Feral", "Nokia Beat Sync", "Custom"
+  ];
+  var STATUSES = ["Planned", "Ready to post", "Posted"];
+  var SLOTS = [
+    { id: "7am",  label: "7 AM",  cls: "tint-am" },
+    { id: "11am", label: "11 AM", cls: "tint-mid" },
+    { id: "7pm",  label: "7 PM",  cls: "tint-pm" }
+  ];
+
+  var data = loadData();
+  var weekStart = startOfWeek(new Date());
+  var formKey = null; // "YYYY-MM-DD__slotId" currently being added/edited
+  var detailKey = null;
+
+  // ---------- storage ----------
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveData() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- dates ----------
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function startOfWeek(d) {
+    var day = d.getDay();            // 0=Sun .. 6=Sat
+    var offset = (day + 6) % 7;      // days since Monday
+    return addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -offset);
+  }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function dateKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function slotKey(d, slotId) { return dateKey(d) + "__" + slotId; }
+  function parseKey(key) {
+    var parts = key.split("__");
+    var dp = parts[0].split("-");
+    return {
+      date: new Date(parseInt(dp[0], 10), parseInt(dp[1], 10) - 1, parseInt(dp[2], 10)),
+      slotId: parts[1]
+    };
+  }
+  function rangeLabel(start) {
+    var end = addDays(start, 6);
+    var o = { month: "short", day: "numeric" };
+    return start.toLocaleDateString("en-US", o) + " – " +
+           end.toLocaleDateString("en-US", o) + ", " + end.getFullYear();
+  }
+  function humanContext(key) {
+    var p = parseKey(key);
+    var slot = SLOTS.filter(function (s) { return s.id === p.slotId; })[0];
+    return p.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
+           " · " + (slot ? slot.label : p.slotId);
+  }
+
+  // ---------- helpers ----------
+  function esc(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function fillSelect(el, options) {
+    el.innerHTML = options.map(function (o) {
+      return '<option value="' + esc(o) + '">' + esc(o) + "</option>";
+    }).join("");
+  }
+
+  // ---------- render ----------
+  function render() {
+    document.getElementById("rangeLabel").textContent = rangeLabel(weekStart);
+    renderChips();
+    renderGrid();
+    renderStats();
+  }
+
+  function renderChips() {
+    var wrap = document.getElementById("quickChips");
+    wrap.innerHTML = "";
+    TYPES.forEach(function (t) {
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.type = "button";
+      b.textContent = "+ " + t;
+      b.addEventListener("click", function () { quickAdd(t); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function renderGrid() {
+    var grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    var todayKey = dateKey(new Date());
+
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(weekStart, i);
+      var col = document.createElement("div");
+      col.className = "day-col";
+
+      var head = document.createElement("div");
+      head.className = "day-head" + (dateKey(d) === todayKey ? " is-today" : "");
+      head.innerHTML =
+        '<div class="dow">' + d.toLocaleDateString("en-US", { weekday: "short" }) + "</div>" +
+        '<div class="date">' + d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + "</div>";
+      col.appendChild(head);
+
+      SLOTS.forEach(function (slot) {
+        var key = slotKey(d, slot.id);
+        var cell = document.createElement("div");
+        cell.className = "slot " + slot.cls;
+        cell.innerHTML = '<div class="slot-label">' + slot.label + "</div>";
+
+        var entry = data[key];
+        if (entry) {
+          cell.appendChild(buildCard(key, entry));
+        } else {
+          var add = document.createElement("button");
+          add.className = "add-slot";
+          add.type = "button";
+          add.textContent = "+ add";
+          add.addEventListener("click", function () { openForm(this.dataset.key); }.bind(add));
+          add.dataset.key = key;
+          cell.appendChild(add);
+        }
+        col.appendChild(cell);
+      });
+      grid.appendChild(col);
+    }
+  }
+
+  function buildCard(key, entry) {
+    var card = document.createElement("div");
+    var posted = entry.status === "Posted";
+    card.className = "card pf-" + entry.platform + (posted ? " is-posted" : "");
+    card.innerHTML =
+      '<div class="c-type">' + esc(entry.type) + "</div>" +
+      '<div class="c-product">' + esc(entry.product) + "</div>" +
+      '<div class="c-status">' + esc(entry.status) + "</div>" +
+      '<div class="card-actions">' +
+        '<button type="button" title="Edit" data-act="edit">✎</button>' +
+        '<button type="button" title="Toggle posted" data-act="posted">' + (posted ? "↺" : "✓") + "</button>" +
+        '<button type="button" title="Delete" data-act="del">✕</button>' +
+      "</div>";
+
+    card.addEventListener("click", function () { openDetail(key); });
+    var actions = card.querySelectorAll(".card-actions button");
+    actions.forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var act = btn.dataset.act;
+        if (act === "edit") openForm(key);
+        else if (act === "posted") togglePosted(key);
+        else if (act === "del") removeEntry(key);
+      });
+    });
+    return card;
+  }
+
+  function renderStats() {
+    var total = 0, posted = 0, tt = 0, ig = 0, bo = 0;
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(weekStart, i);
+      SLOTS.forEach(function (slot) {
+        var e = data[slotKey(d, slot.id)];
+        if (!e) return;
+        total++;
+        if (e.status === "Posted") posted++;
+        if (e.platform === "TikTok") tt++;
+        else if (e.platform === "Instagram") ig++;
+        else if (e.platform === "Both") bo++;
+      });
+    }
+    var remaining = total - posted;
+    document.getElementById("stats").innerHTML =
+      stat(total, "This week") +
+      '<div class="stat divider"></div>' +
+      stat(posted, "Posted") +
+      stat(remaining, "Remaining") +
+      '<div class="stat divider"></div>' +
+      '<div class="pf-legend">' +
+        '<span><span class="dot tt"></span>TikTok ' + tt + "</span>" +
+        '<span><span class="dot ig"></span>Instagram ' + ig + "</span>" +
+        '<span><span class="dot bo"></span>Both ' + bo + "</span>" +
+      "</div>";
+  }
+  function stat(num, lbl) {
+    return '<div class="stat"><div class="num">' + num + '</div><div class="lbl">' + lbl + "</div></div>";
+  }
+
+  // ---------- actions ----------
+  function quickAdd(type) {
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(weekStart, i);
+      for (var s = 0; s < SLOTS.length; s++) {
+        var key = slotKey(d, SLOTS[s].id);
+        if (!data[key]) { openForm(key, type); return; }
+      }
+    }
+    alert("No empty slots left this week — try next week 🎀");
+  }
+
+  function openForm(key, presetType) {
+    formKey = key;
+    var existing = data[key];
+    document.getElementById("formTitle").textContent = existing ? "Edit content" : "Add content";
+    document.getElementById("formCtx").textContent = humanContext(key);
+    document.getElementById("f-platform").value = existing ? existing.platform : PLATFORMS[0];
+    document.getElementById("f-product").value = existing ? existing.product : PRODUCTS[0];
+    document.getElementById("f-type").value = existing ? existing.type : (presetType || TYPES[0]);
+    document.getElementById("f-caption").value = existing ? existing.caption : "";
+    document.getElementById("f-sound").value = existing ? existing.sound : "";
+    document.getElementById("f-status").value = existing ? existing.status : STATUSES[0];
+    closeOverlay("detailOverlay");
+    openOverlay("formOverlay");
+  }
+
+  document.getElementById("contentForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    if (!formKey) return;
+    data[formKey] = {
+      platform: document.getElementById("f-platform").value,
+      product: document.getElementById("f-product").value,
+      type: document.getElementById("f-type").value,
+      caption: document.getElementById("f-caption").value.trim(),
+      sound: document.getElementById("f-sound").value.trim(),
+      status: document.getElementById("f-status").value
+    };
+    saveData();
+    closeOverlay("formOverlay");
+    render();
+  });
+
+  function openDetail(key) {
+    var e = data[key];
+    if (!e) return;
+    detailKey = key;
+    document.getElementById("detailCtx").textContent = humanContext(key);
+    document.getElementById("detailBody").innerHTML =
+      row("Platform", e.platform) +
+      row("Product", e.product) +
+      row("Type", e.type) +
+      row("Caption", e.caption || "—") +
+      row("Sound / tags", e.sound || "—") +
+      row("Status", e.status);
+    document.getElementById("detailPosted").textContent =
+      e.status === "Posted" ? "Mark as planned" : "Mark as posted";
+    closeOverlay("formOverlay");
+    openOverlay("detailOverlay");
+  }
+  function row(k, v) {
+    return '<div class="detail-row"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + "</div></div>";
+  }
+
+  function togglePosted(key) {
+    var e = data[key];
+    if (!e) return;
+    e.status = e.status === "Posted" ? "Planned" : "Posted";
+    saveData();
+    render();
+    if (detailKey === key && document.getElementById("detailOverlay").classList.contains("open")) {
+      openDetail(key);
+    }
+  }
+  function removeEntry(key) {
+    if (!data[key]) return;
+    if (!confirm("Delete this content card?")) return;
+    delete data[key];
+    saveData();
+    closeOverlay("detailOverlay");
+    render();
+  }
+
+  // ---------- overlays ----------
+  function openOverlay(id) { document.getElementById(id).classList.add("open"); }
+  function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
+  function closeAllOverlays() { closeOverlay("formOverlay"); closeOverlay("detailOverlay"); }
+
+  document.getElementById("formCancel").addEventListener("click", function () { closeOverlay("formOverlay"); });
+  document.getElementById("detailClose").addEventListener("click", function () { closeOverlay("detailOverlay"); });
+  document.getElementById("detailEdit").addEventListener("click", function () { if (detailKey) openForm(detailKey); });
+  document.getElementById("detailDelete").addEventListener("click", function () { if (detailKey) removeEntry(detailKey); });
+  document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
+
+  // Click backdrop closes
+  ["formOverlay", "detailOverlay"].forEach(function (id) {
+    document.getElementById(id).addEventListener("click", function (ev) {
+      if (ev.target === this) closeOverlay(id);
+    });
+  });
+  // Escape closes modals
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") closeAllOverlays();
+  });
+
+  // ---------- nav ----------
+  document.getElementById("prevWeek").addEventListener("click", function () { weekStart = addDays(weekStart, -7); render(); });
+  document.getElementById("nextWeek").addEventListener("click", function () { weekStart = addDays(weekStart, 7); render(); });
+  document.getElementById("todayBtn").addEventListener("click", function () { weekStart = startOfWeek(new Date()); render(); });
+
+  // ---------- init ----------
+  fillSelect(document.getElementById("f-platform"), PLATFORMS);
+  fillSelect(document.getElementById("f-product"), PRODUCTS);
+  fillSelect(document.getElementById("f-type"), TYPES);
+  fillSelect(document.getElementById("f-status"), STATUSES);
+  render();
+})();
+</script>
+</body>
+</html>
