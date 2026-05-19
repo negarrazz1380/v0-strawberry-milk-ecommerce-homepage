@@ -113,9 +113,14 @@
   .card.pf-Both::before      { background: var(--both); }
   .card .c-type { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
   .card .c-product { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .card .c-meta { display: flex; align-items: center; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
   .card .c-status {
-    display: inline-block; margin-top: 7px; font-size: 10px; font-weight: 700;
+    display: inline-block; font-size: 10px; font-weight: 700;
     padding: 2px 8px; border-radius: 999px; background: var(--pink-soft); color: var(--pink-dark);
+  }
+  .card .c-vp {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; background: #1e1b2e; color: #f5d5e6;
   }
   .card.is-posted .c-type,
   .card.is-posted .c-product { text-decoration: line-through; }
@@ -139,7 +144,7 @@
   }
   .overlay.open { display: flex; }
   .modal {
-    background: #fff; border-radius: 20px; width: 100%; max-width: 460px;
+    background: #fff; border-radius: 20px; width: 100%; max-width: 480px;
     max-height: 90vh; overflow-y: auto; padding: 26px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
   }
   .modal h2 { font-size: 22px; color: var(--pink-dark); margin-bottom: 2px; }
@@ -154,6 +159,7 @@
     outline: none; border-color: var(--pink); box-shadow: 0 0 0 3px rgba(236,72,153,.12);
   }
   .field textarea { resize: vertical; min-height: 70px; }
+  .field textarea.vp { min-height: 110px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
   .btn-primary {
     flex: 1; background: linear-gradient(135deg, var(--pink) 0%, #f43f5e 100%);
@@ -166,9 +172,26 @@
   .btn-danger:hover { background: #fecaca; }
 
   .detail-row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f4f4f5; font-size: 14px; }
-  .detail-row:last-of-type { border-bottom: none; }
   .detail-row .k { font-weight: 700; color: var(--pink-dark); min-width: 92px; }
   .detail-row .v { color: var(--ink); white-space: pre-wrap; word-break: break-word; flex: 1; }
+
+  .vp-label {
+    font-size: 12px; font-weight: 700; color: var(--pink-dark);
+    margin: 16px 0 6px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .code-box {
+    background: #1e1b2e; color: #f5d5e6;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55; padding: 14px; border-radius: 10px;
+    white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto;
+    border: 1px solid #3b2f4a; margin: 0;
+  }
+  .copy-btn {
+    background: #fbbf24; color: #78350f; padding: 6px 12px; font-size: 12px;
+    font-weight: 700; border-radius: 6px;
+  }
+  .copy-btn:hover { background: #f59e0b; }
+  .copy-btn.copied { background: #10b981; color: #fff; }
 
   .stats {
     position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.92);
@@ -229,8 +252,8 @@
         <select id="f-product" required></select>
       </div>
       <div class="field">
-        <label for="f-type">Content type</label>
-        <select id="f-type" required></select>
+        <label for="f-archetype">Content type / archetype</label>
+        <select id="f-archetype" required></select>
       </div>
       <div class="field">
         <label for="f-caption">Caption / notes</label>
@@ -239,6 +262,10 @@
       <div class="field">
         <label for="f-sound">Sound / hashtags</label>
         <input type="text" id="f-sound" placeholder="e.g. original sound · #casekisses #fyp" />
+      </div>
+      <div class="field">
+        <label for="f-videoprompt">Video prompt (Kling 3.0 / Seedance)</label>
+        <textarea id="f-videoprompt" class="vp" placeholder="Shot-by-shot video prompt…"></textarea>
       </div>
       <div class="field">
         <label for="f-status">Status</label>
@@ -258,7 +285,12 @@
     <h2>Content detail</h2>
     <p class="ctx" id="detailCtx"></p>
     <div id="detailBody"></div>
-    <div class="modal-actions" style="flex-wrap: wrap;">
+    <div class="vp-label">
+      <span>Video prompt</span>
+      <button type="button" class="copy-btn" id="detailCopyVP">Copy prompt</button>
+    </div>
+    <pre class="code-box" id="detailVP"></pre>
+    <div class="modal-actions" style="flex-wrap: wrap; margin-top: 18px;">
       <button type="button" class="btn-primary" id="detailPosted">Mark as posted</button>
       <button type="button" class="btn-ghost" id="detailEdit">Edit</button>
       <button type="button" class="btn-danger" id="detailDelete">Delete</button>
@@ -278,21 +310,82 @@
   var STORAGE_KEY = "ck_calendar";
   var PLATFORMS = ["TikTok", "Instagram", "Both"];
   var PRODUCTS = ["Dog Polka Dot Case", "Dachshund Lanyard Case", "Cocoa Teddy Case", "Multi-case"];
-  var TYPES = [
+  var ARCHETYPES = [
     "ASMR Unboxing", "Coquette POV", "Collection Haul", "Honest Review",
     "Dark Girly Aesthetic", "The Heist", "Dog Goes Feral", "Nokia Beat Sync", "Custom"
   ];
-  var STATUSES = ["Planned", "Ready to post", "Posted"];
+  var STATUSES = [
+    { v: "planned", l: "Planned" },
+    { v: "ready", l: "Ready to post" },
+    { v: "posted", l: "Posted" }
+  ];
   var SLOTS = [
     { id: "7am",  label: "7 AM",  cls: "tint-am" },
     { id: "11am", label: "11 AM", cls: "tint-mid" },
     { id: "7pm",  label: "7 PM",  cls: "tint-pm" }
   ];
 
-  var data = loadData();
+  // 7-day content plan, May 19–25 2026. seedPlan() writes this into
+  // localStorage on first visit only — it never overwrites user data.
+  var SEED = [
+    // Day 0 — Mon May 19
+    { date: "2026-05-19", slot: "7am",  platform: "TikTok",    product: "Dachshund Lanyard Case", archetype: "Coquette POV",        sound: "Espresso - Sabrina Carpenter",          caption: "pov: ur phone case has more personality than most people 🐾🎀 #casekisses",                                videoPrompt: "5-shot Kling 3.0 extreme close-up morning light coquette reveal, cream beads, pink aesthetic, no dialogue vertical 9:16" },
+    { date: "2026-05-19", slot: "11am", platform: "Both",      product: "Multi-case",             archetype: "Collection Haul",     sound: "Good Luck Babe - Chappell Roan",        caption: "not gatekeeping these anymore 😩🎀 all three are on the site rn #casekisses #phonecasecheck",                videoPrompt: "5-shot Kling 3.0 flat lay of all 3 cases on pink silk, each picked up in turn, final shot all 3 fanned in one hand" },
+    { date: "2026-05-19", slot: "7pm",  platform: "TikTok",    product: "Multi-case",             archetype: "The Heist",           sound: "Anxiety - Doechii",                     caption: "the audacity to protect your case like that 😭🖤 #casekisses #darkgirly",                                   videoPrompt: "5-shot Kling 3.0 museum heist dark cinematic, velvet display case, laser grid, gloved hand, all 3 cases" },
+    // Day 1 — Tue May 20
+    { date: "2026-05-20", slot: "7am",  platform: "TikTok",    product: "Dog Polka Dot Case",     archetype: "ASMR Unboxing",       sound: "No music - pure ASMR packaging sounds", caption: "the sounds this case makes when it arrives 😮‍💨🎀 #casekisses #asmr #unboxing",                            videoPrompt: "5-shot Kling 3.0 pink mailer box, tissue paper reveal, slow tactile unboxing, case clicked onto phone" },
+    { date: "2026-05-20", slot: "11am", platform: "Instagram", product: "Cocoa Teddy Case",       archetype: "Coquette POV",        sound: "Lovers Rock - TV Girl",                 caption: "she just gives cozy girl era every time 🧸☕️ #casekisses #cozyaesthetic",                                  videoPrompt: "5-shot Kling 3.0 cafe table, steam from latte, teddy charm pinched between fingers, cozy flatlay with candle" },
+    { date: "2026-05-20", slot: "7pm",  platform: "TikTok",    product: "Dachshund Lanyard Case", archetype: "Dog Goes Feral",      sound: "Nokia - Drake",                         caption: "the dog said this is MY case now 🐾😭 #casekisses #dogsoftiktok",                                           videoPrompt: "5-shot Kling 3.0 Bernese mountain dog in mansion, paw reaching for case, sitting ON the case protectively, defiant look at camera" },
+    // Day 2 — Wed May 21
+    { date: "2026-05-21", slot: "7am",  platform: "Both",      product: "Dog Polka Dot Case",     archetype: "Honest Review",       sound: "Please Please Please - Sabrina Carpenter", caption: "finally caved and ok i get the hype 😍🎀 #casekisses #phonecasecheck #tiktokmademebuyit",                videoPrompt: "Seedance 2.0 Avatar Adriana, holds case up, taps raised dog graphic, approving nod, UGC review energy white background" },
+    { date: "2026-05-21", slot: "11am", platform: "TikTok",    product: "Cocoa Teddy Case",       archetype: "Dark Girly Aesthetic", sound: "Birds of a Feather - Billie Eilish",   caption: "she's soft but she's dangerous 🧸🖤 #casekisses #darkgirly #coquette",                                     videoPrompt: "5-shot Kling 3.0 black velvet surface, single spotlight, black gloved hand lifts charm, rose petals, fade to near-black" },
+    { date: "2026-05-21", slot: "7pm",  platform: "Both",      product: "Dachshund Lanyard Case", archetype: "Nokia Beat Sync",     sound: "Nokia - Drake",                         caption: "the way it just goes with every fit 📱🎀 #casekisses #phonecaseaesthetic",                                  videoPrompt: "5-shot Kling 3.0 beat-sync cuts white/black/pink/marble backgrounds, every cut on the Nokia beat drop" },
+    // Day 3 — Thu May 22
+    { date: "2026-05-22", slot: "7am",  platform: "TikTok",    product: "Cocoa Teddy Case",       archetype: "Coquette POV",        sound: "Vogue - Madonna (currently viral in editorial edits)", caption: "the teddy charm said stay cozy girlie 🧸☕️🎀 #casekisses #cozyvibes",                          videoPrompt: "5-shot Kling 3.0 knit blanket morning light, strike a pose freeze moment on beat, slow 360 rotate, bedside table styled shot" },
+    { date: "2026-05-22", slot: "11am", platform: "Instagram", product: "Dog Polka Dot Case",     archetype: "Collection Haul",     sound: "drop dead - Olivia Rodrigo",            caption: "the polka dots never miss 🐶🎀 not gatekeeping #casekisses #phonecaseaesthetic",                            videoPrompt: "5-shot Kling 3.0 camera circles case from above, extreme close-up on raised dog graphic, case snapped onto iPhone, lifestyle shot case in pocket" },
+    { date: "2026-05-22", slot: "7pm",  platform: "TikTok",    product: "Multi-case",             archetype: "The Heist",           sound: "Beat It - Michael Jackson",             caption: "we don't just sell cases. we sell the vibe 💎🖤 #casekisses #smallbusiness",                                videoPrompt: "5-shot Kling 3.0 CCTV POV black and white, heels walking toward cases on pedestal, dramatic lighting from below on all 3 cases, gloved hand points at each, all 3 fanned cut to black" },
+    // Day 4 — Fri May 23
+    { date: "2026-05-23", slot: "7am",  platform: "Both",      product: "Dachshund Lanyard Case", archetype: "Honest Review",       sound: "Take My Space - Nimino (trending lifestyle edits)", caption: "ok the lanyard is actually so functional and cute?? 🐾😭 #casekisses #phonecasecheck",          videoPrompt: "Seedance 2.0 Avatar Naomi, pulls bead strap to show length, slides card in/out of card slot, holds case up by lanyard from one finger swinging" },
+    { date: "2026-05-23", slot: "11am", platform: "TikTok",    product: "Dog Polka Dot Case",     archetype: "Dark Girly Aesthetic", sound: "Anxiety - Doechii",                    caption: "cute on the outside. menace on the inside 🐶🖤 #casekisses #maincharacter",                                 videoPrompt: "5-shot Kling 3.0 glass surface shot from below, black mirror reflection, extreme close-up texture, high contrast black background, case slammed onto black velvet slow ripple" },
+    { date: "2026-05-23", slot: "7pm",  platform: "Both",      product: "Cocoa Teddy Case",       archetype: "Coquette POV",        sound: "Good Luck Babe - Chappell Roan",        caption: "the charm that lives rent free in my head 🧸🎀 #casekisses #coquette #aesthetic",                          videoPrompt: "5-shot Kling 3.0 stacked pink books, case inside white tote bag peeking out, vanity mirror reflection with pink flowers, final zoom into teddy charm face" },
+    // Day 5 — Sat May 24
+    { date: "2026-05-24", slot: "7am",  platform: "TikTok",    product: "Multi-case",             archetype: "Collection Haul",     sound: "Espresso - Sabrina Carpenter",          caption: "which one are you? 🐾🧸🐶 let me know below #casekisses #phonecases #fyp",                                  videoPrompt: "5-shot Kling 3.0 comparison format, each case isolated in spotlight with its own personality, all 3 reunited at end" },
+    { date: "2026-05-24", slot: "11am", platform: "Instagram", product: "Dachshund Lanyard Case", archetype: "ASMR Unboxing",       sound: "No music - ASMR packaging sounds only", caption: "the beads the lanyard the dachshund 😭🐾 everything #casekisses",                                           videoPrompt: "5-shot Kling 3.0 tissue paper unwrap, bead macro close-up individual beads, card slot demo, phone held by lanyard swinging" },
+    { date: "2026-05-24", slot: "7pm",  platform: "TikTok",    product: "Dog Polka Dot Case",     archetype: "Dog Goes Feral",      sound: "Beat It - Michael Jackson",             caption: "i can't explain it. she just knew 🐶😭🎀 #casekisses #dogsoftiktok #fyp",                                   videoPrompt: "5-shot Kling 3.0 Bernese mountain dog at fancy dining table staring at case, nose pressed to case, paw on case proud possessive, direct eye contact with camera defiant" },
+    // Day 6 — Sun May 25
+    { date: "2026-05-25", slot: "7am",  platform: "Both",      product: "Multi-case",             archetype: "Dark Girly Aesthetic", sound: "Romantic Homicide - d4vd (check commercial approval)", caption: "canadian girlies we finally have cute cases 🇨🇦🎀 ships canada + usa #casekisses #canadiansmallbusiness", videoPrompt: "5-shot Kling 3.0 aerial view of all 3 cases on map of Canada, each case in Canadian winter window light, editorial composition" },
+    { date: "2026-05-25", slot: "11am", platform: "TikTok",    product: "Cocoa Teddy Case",       archetype: "Nokia Beat Sync",     sound: "Nokia - Drake",                         caption: "the teddy said pick me 🧸🎀😭 #casekisses #phonecasesoftiktok",                                             videoPrompt: "5-shot Kling 3.0 beat-sync white/black/pink/brown backgrounds, case centered in every shot, charm lit dramatically, backgrounds flash on final beat" },
+    { date: "2026-05-25", slot: "7pm",  platform: "Both",      product: "Multi-case",             archetype: "Honest Review",       sound: "Please Please Please - Sabrina Carpenter", caption: "3 cases. all under $40. i'm obsessed 😍🎀 #casekisses #phonecasecheck #tiktokmademebuyit",               videoPrompt: "Seedance 2.0 Avatar Adriana holds all 3 cases, examines each one genuinely, pulls lanyard on Dachshund, squeezes teddy charm, holds all 3 up to camera at end" }
+  ];
+
+  var data = {};
   var weekStart = startOfWeek(new Date());
-  var formKey = null; // "YYYY-MM-DD__slotId" currently being added/edited
+  var formKey = null;
   var detailKey = null;
+
+  // ---------- seed ----------
+  function seedPlan() {
+    var raw;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { return; }
+    // Only seed when there is no existing user data — never overwrite.
+    if (raw != null && raw.trim() !== "" && raw.trim() !== "{}") return;
+
+    var seedMap = {};
+    SEED.forEach(function (s) {
+      seedMap[s.date + "__" + s.slot] = {
+        id: "c_" + Math.random().toString(36).slice(2, 10),
+        platform: s.platform,
+        product: s.product,
+        archetype: s.archetype,
+        caption: s.caption,
+        sound: s.sound,
+        videoPrompt: s.videoPrompt,
+        status: "planned",
+        createdAt: Date.now()
+      };
+    });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(seedMap)); } catch (e) { /* ignore */ }
+  }
 
   // ---------- storage ----------
   function loadData() {
@@ -311,8 +404,8 @@
   // ---------- dates ----------
   function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
   function startOfWeek(d) {
-    var day = d.getDay();            // 0=Sun .. 6=Sat
-    var offset = (day + 6) % 7;      // days since Monday
+    var day = d.getDay();
+    var offset = (day + 6) % 7; // days since Monday
     return addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -offset);
   }
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
@@ -345,14 +438,23 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+  function statusLabel(v) {
+    for (var i = 0; i < STATUSES.length; i++) if (STATUSES[i].v === v) return STATUSES[i].l;
+    return v;
+  }
   function fillSelect(el, options) {
     el.innerHTML = options.map(function (o) {
       return '<option value="' + esc(o) + '">' + esc(o) + "</option>";
     }).join("");
   }
+  function fillStatus(el) {
+    el.innerHTML = STATUSES.map(function (s) {
+      return '<option value="' + esc(s.v) + '">' + esc(s.l) + "</option>";
+    }).join("");
+  }
 
   // ---------- render ----------
-  function render() {
+  function renderCalendar() {
     document.getElementById("rangeLabel").textContent = rangeLabel(weekStart);
     renderChips();
     renderGrid();
@@ -362,7 +464,7 @@
   function renderChips() {
     var wrap = document.getElementById("quickChips");
     wrap.innerHTML = "";
-    TYPES.forEach(function (t) {
+    ARCHETYPES.forEach(function (t) {
       var b = document.createElement("button");
       b.className = "chip";
       b.type = "button";
@@ -403,8 +505,8 @@
           add.className = "add-slot";
           add.type = "button";
           add.textContent = "+ add";
-          add.addEventListener("click", function () { openForm(this.dataset.key); }.bind(add));
           add.dataset.key = key;
+          add.addEventListener("click", function () { openForm(this.dataset.key); });
           cell.appendChild(add);
         }
         col.appendChild(cell);
@@ -415,12 +517,15 @@
 
   function buildCard(key, entry) {
     var card = document.createElement("div");
-    var posted = entry.status === "Posted";
+    var posted = entry.status === "posted";
     card.className = "card pf-" + entry.platform + (posted ? " is-posted" : "");
     card.innerHTML =
-      '<div class="c-type">' + esc(entry.type) + "</div>" +
+      '<div class="c-type">' + esc(entry.archetype) + "</div>" +
       '<div class="c-product">' + esc(entry.product) + "</div>" +
-      '<div class="c-status">' + esc(entry.status) + "</div>" +
+      '<div class="c-meta">' +
+        '<span class="c-status">' + esc(statusLabel(entry.status)) + "</span>" +
+        (entry.videoPrompt ? '<span class="c-vp">🎬 prompt</span>' : "") +
+      "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
         '<button type="button" title="Toggle posted" data-act="posted">' + (posted ? "↺" : "✓") + "</button>" +
@@ -428,8 +533,7 @@
       "</div>";
 
     card.addEventListener("click", function () { openDetail(key); });
-    var actions = card.querySelectorAll(".card-actions button");
-    actions.forEach(function (btn) {
+    card.querySelectorAll(".card-actions button").forEach(function (btn) {
       btn.addEventListener("click", function (ev) {
         ev.stopPropagation();
         var act = btn.dataset.act;
@@ -449,18 +553,17 @@
         var e = data[slotKey(d, slot.id)];
         if (!e) return;
         total++;
-        if (e.status === "Posted") posted++;
+        if (e.status === "posted") posted++;
         if (e.platform === "TikTok") tt++;
         else if (e.platform === "Instagram") ig++;
         else if (e.platform === "Both") bo++;
       });
     }
-    var remaining = total - posted;
     document.getElementById("stats").innerHTML =
       stat(total, "This week") +
       '<div class="stat divider"></div>' +
       stat(posted, "Posted") +
-      stat(remaining, "Remaining") +
+      stat(total - posted, "Remaining") +
       '<div class="stat divider"></div>' +
       '<div class="pf-legend">' +
         '<span><span class="dot tt"></span>TikTok ' + tt + "</span>" +
@@ -473,28 +576,29 @@
   }
 
   // ---------- actions ----------
-  function quickAdd(type) {
+  function quickAdd(archetype) {
     for (var i = 0; i < 7; i++) {
       var d = addDays(weekStart, i);
       for (var s = 0; s < SLOTS.length; s++) {
         var key = slotKey(d, SLOTS[s].id);
-        if (!data[key]) { openForm(key, type); return; }
+        if (!data[key]) { openForm(key, archetype); return; }
       }
     }
     alert("No empty slots left this week — try next week 🎀");
   }
 
-  function openForm(key, presetType) {
+  function openForm(key, presetArchetype) {
     formKey = key;
-    var existing = data[key];
-    document.getElementById("formTitle").textContent = existing ? "Edit content" : "Add content";
+    var e = data[key];
+    document.getElementById("formTitle").textContent = e ? "Edit content" : "Add content";
     document.getElementById("formCtx").textContent = humanContext(key);
-    document.getElementById("f-platform").value = existing ? existing.platform : PLATFORMS[0];
-    document.getElementById("f-product").value = existing ? existing.product : PRODUCTS[0];
-    document.getElementById("f-type").value = existing ? existing.type : (presetType || TYPES[0]);
-    document.getElementById("f-caption").value = existing ? existing.caption : "";
-    document.getElementById("f-sound").value = existing ? existing.sound : "";
-    document.getElementById("f-status").value = existing ? existing.status : STATUSES[0];
+    document.getElementById("f-platform").value = e ? e.platform : PLATFORMS[0];
+    document.getElementById("f-product").value = e ? e.product : PRODUCTS[0];
+    document.getElementById("f-archetype").value = e ? e.archetype : (presetArchetype || ARCHETYPES[0]);
+    document.getElementById("f-caption").value = e ? (e.caption || "") : "";
+    document.getElementById("f-sound").value = e ? (e.sound || "") : "";
+    document.getElementById("f-videoprompt").value = e ? (e.videoPrompt || "") : "";
+    document.getElementById("f-status").value = e ? e.status : STATUSES[0].v;
     closeOverlay("detailOverlay");
     openOverlay("formOverlay");
   }
@@ -502,17 +606,21 @@
   document.getElementById("contentForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
     if (!formKey) return;
+    var existing = data[formKey];
     data[formKey] = {
+      id: existing && existing.id ? existing.id : "c_" + Math.random().toString(36).slice(2, 10),
       platform: document.getElementById("f-platform").value,
       product: document.getElementById("f-product").value,
-      type: document.getElementById("f-type").value,
+      archetype: document.getElementById("f-archetype").value,
       caption: document.getElementById("f-caption").value.trim(),
       sound: document.getElementById("f-sound").value.trim(),
-      status: document.getElementById("f-status").value
+      videoPrompt: document.getElementById("f-videoprompt").value.trim(),
+      status: document.getElementById("f-status").value,
+      createdAt: existing && existing.createdAt ? existing.createdAt : Date.now()
     };
     saveData();
     closeOverlay("formOverlay");
-    render();
+    renderCalendar();
   });
 
   function openDetail(key) {
@@ -523,12 +631,13 @@
     document.getElementById("detailBody").innerHTML =
       row("Platform", e.platform) +
       row("Product", e.product) +
-      row("Type", e.type) +
+      row("Archetype", e.archetype) +
       row("Caption", e.caption || "—") +
       row("Sound / tags", e.sound || "—") +
-      row("Status", e.status);
+      row("Status", statusLabel(e.status));
+    document.getElementById("detailVP").textContent = e.videoPrompt || "No video prompt yet.";
     document.getElementById("detailPosted").textContent =
-      e.status === "Posted" ? "Mark as planned" : "Mark as posted";
+      e.status === "posted" ? "Mark as planned" : "Mark as posted";
     closeOverlay("formOverlay");
     openOverlay("detailOverlay");
   }
@@ -536,12 +645,23 @@
     return '<div class="detail-row"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + "</div></div>";
   }
 
+  document.getElementById("detailCopyVP").addEventListener("click", function () {
+    var btn = this;
+    var text = document.getElementById("detailVP").textContent;
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add("copied");
+      btn.textContent = "✓ Copied!";
+      setTimeout(function () { btn.classList.remove("copied"); btn.textContent = "Copy prompt"; }, 2000);
+    });
+  });
+
   function togglePosted(key) {
     var e = data[key];
     if (!e) return;
-    e.status = e.status === "Posted" ? "Planned" : "Posted";
+    e.status = e.status === "posted" ? "planned" : "posted";
     saveData();
-    render();
+    renderCalendar();
     if (detailKey === key && document.getElementById("detailOverlay").classList.contains("open")) {
       openDetail(key);
     }
@@ -552,7 +672,7 @@
     delete data[key];
     saveData();
     closeOverlay("detailOverlay");
-    render();
+    renderCalendar();
   }
 
   // ---------- overlays ----------
@@ -566,28 +686,29 @@
   document.getElementById("detailDelete").addEventListener("click", function () { if (detailKey) removeEntry(detailKey); });
   document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
 
-  // Click backdrop closes
   ["formOverlay", "detailOverlay"].forEach(function (id) {
     document.getElementById(id).addEventListener("click", function (ev) {
       if (ev.target === this) closeOverlay(id);
     });
   });
-  // Escape closes modals
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape") closeAllOverlays();
   });
 
   // ---------- nav ----------
-  document.getElementById("prevWeek").addEventListener("click", function () { weekStart = addDays(weekStart, -7); render(); });
-  document.getElementById("nextWeek").addEventListener("click", function () { weekStart = addDays(weekStart, 7); render(); });
-  document.getElementById("todayBtn").addEventListener("click", function () { weekStart = startOfWeek(new Date()); render(); });
+  document.getElementById("prevWeek").addEventListener("click", function () { weekStart = addDays(weekStart, -7); renderCalendar(); });
+  document.getElementById("nextWeek").addEventListener("click", function () { weekStart = addDays(weekStart, 7); renderCalendar(); });
+  document.getElementById("todayBtn").addEventListener("click", function () { weekStart = startOfWeek(new Date()); renderCalendar(); });
 
   // ---------- init ----------
   fillSelect(document.getElementById("f-platform"), PLATFORMS);
   fillSelect(document.getElementById("f-product"), PRODUCTS);
-  fillSelect(document.getElementById("f-type"), TYPES);
-  fillSelect(document.getElementById("f-status"), STATUSES);
-  render();
+  fillSelect(document.getElementById("f-archetype"), ARCHETYPES);
+  fillStatus(document.getElementById("f-status"));
+
+  seedPlan();
+  data = loadData();
+  renderCalendar();
 })();
 </script>
 </body>
