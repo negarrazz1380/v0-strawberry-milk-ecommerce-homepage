@@ -32,6 +32,7 @@ from typing import Optional
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
@@ -48,7 +49,7 @@ except ImportError:
 try:
     import pyperclip
 except ImportError:
-    print("❌ pyperclip is not installed. Run: pip install pyperclip")
+    print("❌ pyperclip is not installed. Please run: pip3 install pyperclip")
     sys.exit(1)
 
 
@@ -130,12 +131,12 @@ def upload_video(driver, video_path: Path) -> None:
 
 
 def type_caption(driver, text: str) -> None:
-    """Paste the caption via the system clipboard (Cmd+V on macOS).
+    """Clear TikTok's auto-filled filename, then paste the real caption.
 
-    ChromeDriver's send_keys rejects non-BMP characters (emojis), so we
-    route the text through the OS clipboard — pyperclip writes it locally
-    and Cmd+V pastes it into the contenteditable field, bypassing
-    ChromeDriver's text channel entirely.
+    TikTok pre-fills the description with the uploaded filename. We have
+    to explicitly select-all + delete first, then paste the caption from
+    the OS clipboard so emojis (non-BMP) bypass ChromeDriver's text
+    channel and round-trip cleanly.
     """
     print("   Looking for caption field...")
     caption_el = WebDriverWait(driver, 20).until(
@@ -143,13 +144,21 @@ def type_caption(driver, text: str) -> None:
             (By.CSS_SELECTOR, "div[contenteditable='true']")
         )
     )
+
+    print("   Clicking caption field to focus...")
     caption_el.click()
     human_pause(0.5, 1.5)
 
+    print("   Selecting all existing text (Cmd+A)...")
+    ActionChains(driver).key_down(Keys.COMMAND).send_keys("a").key_up(Keys.COMMAND).perform()
+
+    print("   Deleting selected text...")
+    driver.find_element(By.CSS_SELECTOR, "div[contenteditable='true']").send_keys(Keys.DELETE)
+    time.sleep(1)
+
+    print("   Pasting caption from clipboard (Cmd+V)...")
     pyperclip.copy(text)
-    caption_el.send_keys(Keys.COMMAND, "a")
-    human_pause(0.3, 0.6)
-    caption_el.send_keys(Keys.COMMAND, "v")
+    ActionChains(driver).key_down(Keys.COMMAND).send_keys("v").key_up(Keys.COMMAND).perform()
     time.sleep(1)
 
 
