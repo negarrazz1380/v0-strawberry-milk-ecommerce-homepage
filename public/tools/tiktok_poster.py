@@ -129,8 +129,8 @@ def type_caption(driver, text: str) -> None:
     """The TikTok caption field is a contenteditable div, not a textarea.
 
     send_keys() goes through ChromeDriver which rejects non-BMP characters
-    (emojis live in supplementary planes). We use document.execCommand
-    insertText instead, which accepts the full Unicode range.
+    (emojis live in supplementary planes). We use the CDP Input.insertText
+    command instead, which accepts the full Unicode range.
     """
     caption_el = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located(
@@ -146,20 +146,14 @@ def type_caption(driver, text: str) -> None:
     human_pause(0.3, 0.8)
 
     try:
-        driver.execute_script(
-            """
-            var el = arguments[0];
-            el.focus();
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, arguments[1]);
-            """,
-            caption_el,
-            text,
-        )
+        # CDP Input.insertText bypasses ChromeDriver's BMP limit and inserts
+        # at the current focus, so emojis go through cleanly.
+        driver.execute_cdp_cmd("Input.insertText", {"text": text})
         time.sleep(1)
     except WebDriverException:
-        # Fallback: ChromeDriver can't take non-BMP via send_keys, so strip
-        # anything outside the BMP before falling back.
+        # Fallback for non-Chrome drivers or CDP being unavailable: strip
+        # anything outside the BMP before send_keys, which would otherwise
+        # crash on emojis.
         safe_text = re.sub(r"[^\u0000-\uFFFF]", "", text)
         caption_el.send_keys(safe_text)
         time.sleep(1)
