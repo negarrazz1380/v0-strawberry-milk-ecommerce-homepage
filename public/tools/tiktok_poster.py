@@ -271,7 +271,7 @@ def main():
     options = Options()
     options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
     driver = webdriver.Chrome(options=options)
-    driver.get("https://www.tiktok.com/tiktok-studio/upload")
+    driver.get("https://www.tiktok.com/tiktokstudio/upload?from=creator_center&tab=video")
 
     scheduled = []
     skipped = []
@@ -297,7 +297,7 @@ def main():
 
         # Always start each item on a fresh upload page.
         try:
-            driver.get("https://www.tiktok.com/tiktok-studio/upload")
+            driver.get("https://www.tiktok.com/tiktokstudio/upload?from=creator_center&tab=video")
             human_pause(2, 4)
         except Exception as e:
             print(f"   ⚠️  Couldn't reload upload page: {e}")
