@@ -31,6 +31,7 @@ from typing import Optional
 
 try:
     from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
@@ -249,6 +250,13 @@ def main():
     print(f"   Videos: {VIDEO_DIR}")
     print()
 
+    print("STEP 1: Quit Chrome completely (Cmd+Q)")
+    print("STEP 2: Open Terminal and run this command:")
+    print("/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222")
+    print("STEP 3: Chrome will open — log into TikTok Studio (studio.tiktok.com)")
+    print("STEP 4: Come back here and press Enter")
+    input()
+
     queue = load_queue()
     if not queue:
         print("Queue is empty — nothing to schedule.")
@@ -259,14 +267,11 @@ def main():
         print("   Run setup_casekisses.sh first.")
         sys.exit(1)
 
-    print(f"Loaded {len(queue)} item(s). Opening Chrome with your existing profile.\n")
-    options = webdriver.ChromeOptions()
-    options.add_argument("--user-data-dir=/Users/negarrazazzadeh/Library/Application Support/Google/Chrome")
-    options.add_argument("--profile-directory=Default")
-    options.add_argument("--no-first-run")
-    options.add_argument("--no-default-browser-check")
+    print(f"Loaded {len(queue)} item(s). Connecting to Chrome on port 9222.\n")
+    options = Options()
+    options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
     driver = webdriver.Chrome(options=options)
-    driver.get("https://www.tiktok.com/tiktokstudio/upload")
+    driver.get("https://www.tiktok.com/tiktok-studio/upload")
 
     scheduled = []
     skipped = []
@@ -289,11 +294,10 @@ def main():
 
         print(f"   📹 Found: {video_path}")
         print(f"   Ready to post: {date} {time_str} {platform} - {archetype} - {video_name}")
-        input("   Press Enter when TikTok upload page is open... ")
 
         # Always start each item on a fresh upload page.
         try:
-            driver.get("https://www.tiktok.com/tiktokstudio/upload")
+            driver.get("https://www.tiktok.com/tiktok-studio/upload")
             human_pause(2, 4)
         except Exception as e:
             print(f"   ⚠️  Couldn't reload upload page: {e}")
