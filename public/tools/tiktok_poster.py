@@ -259,11 +259,14 @@ def main():
         print("   Run setup_casekisses.sh first.")
         sys.exit(1)
 
-    print(f"Loaded {len(queue)} item(s). Opening Chrome — log into TikTok if needed.\n")
-    driver = webdriver.Chrome()
+    print(f"Loaded {len(queue)} item(s). Opening Chrome with your existing profile.\n")
+    options = webdriver.ChromeOptions()
+    options.add_argument("--user-data-dir=/Users/negarrazazzadeh/Library/Application Support/Google/Chrome")
+    options.add_argument("--profile-directory=Default")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    driver = webdriver.Chrome(options=options)
     driver.get("https://www.tiktok.com/tiktokstudio/upload")
-
-    input("Press Enter once you're logged in and the TikTok upload page is open... ")
 
     scheduled = []
     skipped = []
