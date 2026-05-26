@@ -40,6 +40,7 @@ try:
         TimeoutException,
         NoSuchElementException,
         ElementNotInteractableException,
+        WebDriverException,
     )
 except ImportError:
     print("❌ Selenium is not installed. Run: pip install selenium")
@@ -158,14 +159,31 @@ def pick_tiktok_sound(driver, sound_name: str) -> None:
         print(f"   ⚠️  Couldn't attach sound '{sound_name}': {e.__class__.__name__}")
 
 
+def dismiss_popups(driver) -> None:
+    """Best-effort: click any post-upload popups (Got it / OK / Dismiss)."""
+    for label in ("Got it", "OK", "Dismiss"):
+        try:
+            btn = driver.find_element(
+                By.XPATH, f"//button[normalize-space()='{label}']"
+            )
+            btn.click()
+            time.sleep(2)
+        except (NoSuchElementException, ElementNotInteractableException):
+            pass
+
+
 def choose_schedule(driver, date_str: str, time_str: str) -> None:
     """Toggle the Schedule radio, then set date + time fields."""
+    # Bring the "When to post" section into view before interacting.
+    driver.execute_script("window.scrollBy(0, 400)")
+    human_pause(1, 2)
+
     # Click "Schedule" radio
     schedule_radio = wait_clickable(
         driver, By.XPATH, "//*[contains(text(), 'Schedule')]", timeout=15
     )
     schedule_radio.click()
-    human_pause()
+    human_pause(1, 2)
 
     # Date field — TikTok presents date and time as masked text inputs.
     try:
@@ -199,15 +217,18 @@ def choose_schedule(driver, date_str: str, time_str: str) -> None:
         print(f"   ⚠️  Time field issue: {e.__class__.__name__}")
 
 
-def click_schedule_button(driver) -> None:
-    """Click the final Schedule / Confirm button at the bottom of the form."""
+def click_post_button(driver) -> None:
+    """Click the red Post button at the bottom; fall back to JS click."""
     btn = wait_clickable(
         driver,
         By.XPATH,
-        "//button[normalize-space()='Schedule' or normalize-space()='Confirm']",
+        "//button[normalize-space()='Post']",
         timeout=15,
     )
-    btn.click()
+    try:
+        btn.click()
+    except (ElementNotInteractableException, WebDriverException):
+        driver.execute_script("arguments[0].click()", btn)
 
 
 # ---------- per-item driver ----------
@@ -218,24 +239,31 @@ def post_one(driver, item: dict, video_path: Path) -> bool:
 
     try:
         upload_video(driver, video_path)
-        human_pause()
+        human_pause(2, 3)
+
+        dismiss_popups(driver)
+        human_pause(2, 3)
 
         type_caption(driver, caption)
-        human_pause()
+        human_pause(2, 3)
 
         if sound_source == "tiktok":
             pick_tiktok_sound(driver, sound)
+            human_pause(2, 3)
         else:
             print("   ⏭  Sound already in video — skipping sound picker.")
 
-        choose_schedule(driver, item.get("scheduleDate", ""), item.get("scheduleTime", ""))
-        human_pause()
+        schedule_date = item.get("scheduleDate", "")
+        schedule_time = item.get("scheduleTime", "")
+        if schedule_date and schedule_time:
+            choose_schedule(driver, schedule_date, schedule_time)
+            human_pause(2, 3)
 
-        click_schedule_button(driver)
-        human_pause(2, 4)
+        click_post_button(driver)
+        human_pause(2, 3)
 
         preview = caption[:60] + ("…" if len(caption) > 60 else "")
-        print(f"   ✅ Scheduled: {preview}")
+        print(f"   ✅ Posted: {preview}")
         return True
 
     except Exception as e:
