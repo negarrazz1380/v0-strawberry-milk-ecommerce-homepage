@@ -24,7 +24,6 @@ from __future__ import annotations
 import json
 import os
 import random
-import re
 import sys
 import time
 from pathlib import Path
@@ -41,10 +40,15 @@ try:
         TimeoutException,
         NoSuchElementException,
         ElementNotInteractableException,
-        WebDriverException,
     )
 except ImportError:
     print("❌ Selenium is not installed. Run: pip install selenium")
+    sys.exit(1)
+
+try:
+    import pyperclip
+except ImportError:
+    print("❌ pyperclip is not installed. Run: pip install pyperclip")
     sys.exit(1)
 
 
@@ -126,38 +130,27 @@ def upload_video(driver, video_path: Path) -> None:
 
 
 def type_caption(driver, text: str) -> None:
-    """The TikTok caption field is a contenteditable div, not a textarea.
+    """Paste the caption via the system clipboard (Cmd+V on macOS).
 
-    send_keys() goes through ChromeDriver which rejects non-BMP characters
-    (emojis live in supplementary planes). We use the CDP Input.insertText
-    command instead, which accepts the full Unicode range.
+    ChromeDriver's send_keys rejects non-BMP characters (emojis), so we
+    route the text through the OS clipboard — pyperclip writes it locally
+    and Cmd+V pastes it into the contenteditable field, bypassing
+    ChromeDriver's text channel entirely.
     """
     print("   Looking for caption field...")
     caption_el = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located(
-            (By.CSS_SELECTOR, 'div[contenteditable="true"], [data-text="true"]')
+            (By.CSS_SELECTOR, "div[contenteditable='true']")
         )
     )
     caption_el.click()
     human_pause(0.5, 1.5)
-    # Clear what TikTok auto-filled (often the filename). Ctrl+A is safe
-    # for send_keys (no non-BMP chars).
-    caption_el.send_keys(Keys.CONTROL, "a")
-    caption_el.send_keys(Keys.DELETE)
-    human_pause(0.3, 0.8)
 
-    try:
-        # CDP Input.insertText bypasses ChromeDriver's BMP limit and inserts
-        # at the current focus, so emojis go through cleanly.
-        driver.execute_cdp_cmd("Input.insertText", {"text": text})
-        time.sleep(1)
-    except WebDriverException:
-        # Fallback for non-Chrome drivers or CDP being unavailable: strip
-        # anything outside the BMP before send_keys, which would otherwise
-        # crash on emojis.
-        safe_text = re.sub(r"[^\u0000-\uFFFF]", "", text)
-        caption_el.send_keys(safe_text)
-        time.sleep(1)
+    pyperclip.copy(text)
+    caption_el.send_keys(Keys.COMMAND, "a")
+    human_pause(0.3, 0.6)
+    caption_el.send_keys(Keys.COMMAND, "v")
+    time.sleep(1)
 
 
 def pick_tiktok_sound(driver, sound_name: str) -> None:
@@ -192,8 +185,14 @@ def dismiss_popups(driver) -> None:
             pass
 
 
-def choose_schedule(driver, date_str: str, time_str: str) -> None:
-    """Toggle the Schedule radio, then set date + time fields."""
+def choose_schedule(driver, date_str: str = "", time_str: str = "") -> None:
+    """Toggle the Schedule radio and let TikTok auto-fill date/time.
+
+    We intentionally do not touch the date or time inputs — TikTok
+    auto-fills today + 19:40, and any input we tried to inject opened
+    pickers that were unreliable to dismiss. date_str/time_str are
+    accepted for backward compatibility but ignored.
+    """
     # Bring the "When to post" section into view before interacting.
     driver.execute_script("window.scrollBy(0, 400)")
     human_pause(1, 2)
@@ -206,48 +205,23 @@ def choose_schedule(driver, date_str: str, time_str: str) -> None:
             f"Expected 2+ input[type=radio] elements, found {len(radios)}"
         )
     driver.execute_script("arguments[0].click()", radios[1])
-    human_pause(1, 2)
+    time.sleep(3)
 
-    print("   Looking for date/time inputs...")
-    # Date field — TikTok presents date and time as masked text inputs.
-    date_xpath = "//input[contains(@placeholder, 'Date') or contains(@placeholder, 'date')]"
-    try:
-        date_input = wait_for(driver, By.XPATH, date_xpath, timeout=10)
-    except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ❌ Couldn't find Date input (xpath: {date_xpath}): {e.__class__.__name__}")
-        raise
-    date_input.click()
-    date_input.send_keys(Keys.CONTROL, "a")
-    date_input.send_keys(date_str)  # YYYY-MM-DD
-    date_input.send_keys(Keys.ENTER)
-    human_pause()
-
-    time_xpath = "//input[contains(@placeholder, 'Time') or contains(@placeholder, 'time')]"
-    try:
-        time_input = wait_for(driver, By.XPATH, time_xpath, timeout=10)
-    except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ❌ Couldn't find Time input (xpath: {time_xpath}): {e.__class__.__name__}")
-        raise
-    time_input.click()
-    time_input.send_keys(Keys.CONTROL, "a")
-    time_input.send_keys(time_str)  # HH:MM
-    time_input.send_keys(Keys.ENTER)
-    human_pause()
+    # Close any calendar/time picker the radio click may have opened.
+    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+    time.sleep(1)
 
 
 def click_post_button(driver) -> None:
-    """Click the red Post button at the bottom; fall back to JS click."""
+    """Click the submit button — "Schedule" when scheduling, else "Post"."""
     print("   Looking for Post button...")
-    post_xpath = "//button[normalize-space()='Post']"
-    try:
-        btn = wait_clickable(driver, By.XPATH, post_xpath, timeout=10)
-    except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ❌ Couldn't find Post button (xpath: {post_xpath}): {e.__class__.__name__}")
-        raise
-    try:
-        btn.click()
-    except (ElementNotInteractableException, WebDriverException):
-        driver.execute_script("arguments[0].click()", btn)
+    for btn in driver.find_elements(By.TAG_NAME, "button"):
+        label = (btn.text or "").strip()
+        if label in ("Schedule", "Post"):
+            driver.execute_script("arguments[0].click()", btn)
+            return
+    print("   ❌ Couldn't find Schedule/Post button among page buttons")
+    raise NoSuchElementException("No button with text 'Schedule' or 'Post' found")
 
 
 # ---------- per-item driver ----------
