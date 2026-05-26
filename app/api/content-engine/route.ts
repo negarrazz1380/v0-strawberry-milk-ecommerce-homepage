@@ -24,10 +24,21 @@ Respond with ONLY a single valid JSON object and nothing else — no markdown, n
   "alt_spicy": "a bolder, more confident variant of the caption",
   "alt_soft": "a more vulnerable, emotional variant of the caption",
   "engagement_hook": "what to do in the first hour (comment strategy, etc.)",
-  "revenue_angle": "one sentence on how this drives actual sales"
+  "revenue_angle": "one sentence on how this drives actual sales",
+  "video_prompt": "a complete, ready-to-use Higgsfield / Kling 3.0 video prompt — follow the rules below"
 }
 
-"hashtags" must be a JSON array of 7-8 strings. Keep copy authentic to a Gen-Z girly brand voice. Be specific, never generic.`
+"hashtags" must be a JSON array of 7-8 strings.
+
+The "video_prompt" field must be a complete, ready-to-use Higgsfield / Kling 3.0 video prompt:
+- Break it into numbered shots (Shot 1, Shot 2, Shot 3, ...).
+- Give exact timing: 1.6-1.9s per shot and 0.2s transitions between shots.
+- Every shot needs explicit camera directions (angle, movement, lens feel) and one specific physical action.
+- The visual style MUST match the content type/archetype: dark, moody, high-contrast and cinematic for "The Heist" and "Dark Girly Aesthetic"; fast, chaotic, handheld energy for "Dog Goes Feral"; soft pink, dreamy, slow-motion and feminine for "Coquette POV"; clean tactile close-up macro for "ASMR Unboxing"; aspirational confident flex for "Collection Haul"; honest and natural for "Honest Review". Adapt sensibly for any other type.
+- The entire value MUST always end with exactly this text: no dialogue, vertical 9:16, reproduce case exactly as shown in reference image
+- Keep the entire "video_prompt" value under 2500 characters.
+
+All 12 fields above (including "video_prompt") are required and must be present. Keep copy authentic to a Gen-Z girly brand voice. Be specific, never generic.`
 
 const MAX_FIELD_LEN = 500
 

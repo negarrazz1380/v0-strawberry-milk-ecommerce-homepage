@@ -123,6 +123,22 @@
         .copy-btn:hover { background: #f59e0b; }
         .copy-btn.copied { background: #10b981; color: white; }
 
+        .code-box {
+            background: #1e1b2e;
+            color: #f5d5e6;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            padding: 16px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 360px;
+            overflow-y: auto;
+            border: 1px solid #3b2f4a;
+            margin: 0;
+        }
+
         .hashtag-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -316,6 +332,12 @@
                 <div class="alternatives" id="alternativesResult"></div>
             </div>
 
+            <div class="result-section">
+                <div class="result-title">Higgsfield / Kling 3.0 Video Prompt</div>
+                <pre class="code-box" id="videoPromptText"></pre>
+                <button class="copy-btn" onclick="copyVideoPrompt(this)" style="width: 100%;">Copy Prompt</button>
+            </div>
+
             <div class="tips">
                 <strong>Pro tip:</strong> If engagement is lower than expected in first 6 hours, swap to an alternative caption by editing the post — TikTok re-indexes within 30 minutes.
             </div>
@@ -422,6 +444,8 @@
 
             document.getElementById('alternativesResult').innerHTML = altsHTML;
 
+            document.getElementById('videoPromptText').textContent = result.video_prompt || '';
+
             document.getElementById('formSection').style.display = 'none';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('resultsSection').style.display = 'block';
@@ -450,6 +474,18 @@
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.textContent = 'Copy All Hashtags';
+                }, 2000);
+            });
+        }
+
+        function copyVideoPrompt(button) {
+            const text = document.getElementById('videoPromptText').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                button.classList.add('copied');
+                button.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.textContent = 'Copy Prompt';
                 }, 2000);
             });
         }
