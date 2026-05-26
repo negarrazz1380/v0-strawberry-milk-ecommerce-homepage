@@ -228,6 +228,18 @@ def click_post_button(driver) -> None:
         label = (btn.text or "").strip()
         if label in ("Schedule", "Post"):
             driver.execute_script("arguments[0].click()", btn)
+            # TikTok sometimes interstitial-prompts "Continue to post?" with
+            # a "Post now" confirmation button; click it if it shows up.
+            try:
+                confirm_btn = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[normalize-space()='Post now']")
+                    )
+                )
+                driver.execute_script("arguments[0].click()", confirm_btn)
+                print("Dismissed content check popup - clicked Post now")
+            except (TimeoutException, NoSuchElementException):
+                pass
             return
     print("   ❌ Couldn't find Schedule/Post button among page buttons")
     raise NoSuchElementException("No button with text 'Schedule' or 'Post' found")
