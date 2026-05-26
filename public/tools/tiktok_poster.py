@@ -132,6 +132,7 @@ def type_caption(driver, text: str) -> None:
     (emojis live in supplementary planes). We use the CDP Input.insertText
     command instead, which accepts the full Unicode range.
     """
+    print("   Looking for caption field...")
     caption_el = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located(
             (By.CSS_SELECTOR, 'div[contenteditable="true"], [data-text="true"]')
@@ -197,53 +198,52 @@ def choose_schedule(driver, date_str: str, time_str: str) -> None:
     driver.execute_script("window.scrollBy(0, 400)")
     human_pause(1, 2)
 
-    # Click "Schedule" radio
-    schedule_radio = wait_clickable(
-        driver, By.XPATH, "//*[contains(text(), 'Schedule')]", timeout=15
-    )
+    print("   Looking for Schedule radio button...")
+    radio_xpath = "//*[contains(text(), 'Schedule')]"
+    try:
+        schedule_radio = wait_clickable(driver, By.XPATH, radio_xpath, timeout=10)
+    except (TimeoutException, NoSuchElementException) as e:
+        print(f"   ❌ Couldn't find Schedule radio (xpath: {radio_xpath}): {e.__class__.__name__}")
+        raise
     schedule_radio.click()
     human_pause(1, 2)
 
+    print("   Looking for date/time inputs...")
     # Date field — TikTok presents date and time as masked text inputs.
+    date_xpath = "//input[contains(@placeholder, 'Date') or contains(@placeholder, 'date')]"
     try:
-        date_input = wait_for(
-            driver,
-            By.XPATH,
-            "//input[contains(@placeholder, 'Date') or contains(@placeholder, 'date')]",
-            timeout=10,
-        )
-        date_input.click()
-        date_input.send_keys(Keys.CONTROL, "a")
-        date_input.send_keys(date_str)  # YYYY-MM-DD
-        date_input.send_keys(Keys.ENTER)
-        human_pause()
+        date_input = wait_for(driver, By.XPATH, date_xpath, timeout=10)
     except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ⚠️  Date field issue: {e.__class__.__name__}")
+        print(f"   ❌ Couldn't find Date input (xpath: {date_xpath}): {e.__class__.__name__}")
+        raise
+    date_input.click()
+    date_input.send_keys(Keys.CONTROL, "a")
+    date_input.send_keys(date_str)  # YYYY-MM-DD
+    date_input.send_keys(Keys.ENTER)
+    human_pause()
 
+    time_xpath = "//input[contains(@placeholder, 'Time') or contains(@placeholder, 'time')]"
     try:
-        time_input = wait_for(
-            driver,
-            By.XPATH,
-            "//input[contains(@placeholder, 'Time') or contains(@placeholder, 'time')]",
-            timeout=10,
-        )
-        time_input.click()
-        time_input.send_keys(Keys.CONTROL, "a")
-        time_input.send_keys(time_str)  # HH:MM
-        time_input.send_keys(Keys.ENTER)
-        human_pause()
+        time_input = wait_for(driver, By.XPATH, time_xpath, timeout=10)
     except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ⚠️  Time field issue: {e.__class__.__name__}")
+        print(f"   ❌ Couldn't find Time input (xpath: {time_xpath}): {e.__class__.__name__}")
+        raise
+    time_input.click()
+    time_input.send_keys(Keys.CONTROL, "a")
+    time_input.send_keys(time_str)  # HH:MM
+    time_input.send_keys(Keys.ENTER)
+    human_pause()
 
 
 def click_post_button(driver) -> None:
     """Click the red Post button at the bottom; fall back to JS click."""
-    btn = wait_clickable(
-        driver,
-        By.XPATH,
-        "//button[normalize-space()='Post']",
-        timeout=15,
-    )
+    print("   Looking for Post button...")
+    post_xpath = "//button[normalize-space()='Post']"
+    try:
+        btn = wait_clickable(driver, By.XPATH, post_xpath, timeout=10)
+    except (TimeoutException, NoSuchElementException) as e:
+        print(f"   ❌ Couldn't find Post button (xpath: {post_xpath}): {e.__class__.__name__}")
+        raise
     try:
         btn.click()
     except (ElementNotInteractableException, WebDriverException):
