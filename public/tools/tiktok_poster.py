@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -125,7 +126,12 @@ def upload_video(driver, video_path: Path) -> None:
 
 
 def type_caption(driver, text: str) -> None:
-    """The TikTok caption field is a contenteditable div, not a textarea."""
+    """The TikTok caption field is a contenteditable div, not a textarea.
+
+    send_keys() goes through ChromeDriver which rejects non-BMP characters
+    (emojis live in supplementary planes). We use document.execCommand
+    insertText instead, which accepts the full Unicode range.
+    """
     caption_el = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located(
             (By.CSS_SELECTOR, 'div[contenteditable="true"], [data-text="true"]')
@@ -133,11 +139,30 @@ def type_caption(driver, text: str) -> None:
     )
     caption_el.click()
     human_pause(0.5, 1.5)
-    # Clear what TikTok auto-filled (often the filename).
+    # Clear what TikTok auto-filled (often the filename). Ctrl+A is safe
+    # for send_keys (no non-BMP chars).
     caption_el.send_keys(Keys.CONTROL, "a")
     caption_el.send_keys(Keys.DELETE)
     human_pause(0.3, 0.8)
-    caption_el.send_keys(text)
+
+    try:
+        driver.execute_script(
+            """
+            var el = arguments[0];
+            el.focus();
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, arguments[1]);
+            """,
+            caption_el,
+            text,
+        )
+        time.sleep(1)
+    except WebDriverException:
+        # Fallback: ChromeDriver can't take non-BMP via send_keys, so strip
+        # anything outside the BMP before falling back.
+        safe_text = re.sub(r"[^\u0000-\uFFFF]", "", text)
+        caption_el.send_keys(safe_text)
+        time.sleep(1)
 
 
 def pick_tiktok_sound(driver, sound_name: str) -> None:
