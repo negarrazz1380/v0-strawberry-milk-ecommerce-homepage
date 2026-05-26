@@ -199,13 +199,13 @@ def choose_schedule(driver, date_str: str, time_str: str) -> None:
     human_pause(1, 2)
 
     print("   Looking for Schedule radio button...")
-    radio_xpath = "//*[contains(text(), 'Schedule')]"
-    try:
-        schedule_radio = wait_clickable(driver, By.XPATH, radio_xpath, timeout=10)
-    except (TimeoutException, NoSuchElementException) as e:
-        print(f"   ❌ Couldn't find Schedule radio (xpath: {radio_xpath}): {e.__class__.__name__}")
-        raise
-    schedule_radio.click()
+    radios = driver.find_elements(By.CSS_SELECTOR, 'input[type="radio"]')
+    if len(radios) < 2:
+        print(f"   ❌ Expected 2+ radios for Now/Schedule, found {len(radios)}")
+        raise NoSuchElementException(
+            f"Expected 2+ input[type=radio] elements, found {len(radios)}"
+        )
+    driver.execute_script("arguments[0].click()", radios[1])
     human_pause(1, 2)
 
     print("   Looking for date/time inputs...")
