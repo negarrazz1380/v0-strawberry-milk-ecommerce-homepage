@@ -18,12 +18,16 @@ its DOM often. If a step fails for a single post the script logs the
 error and moves on, so a partial run still gets you most of the way.
 """
 
+# Lets us use `Path | None` annotations on Python 3.9 (string-deferred).
+from __future__ import annotations
+
 import json
 import os
 import random
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 try:
     from selenium import webdriver
