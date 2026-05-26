@@ -116,15 +116,64 @@
   .card .c-meta { display: flex; align-items: center; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
   .card .c-status {
     display: inline-block; font-size: 10px; font-weight: 700;
-    padding: 2px 8px; border-radius: 999px; background: var(--pink-soft); color: var(--pink-dark);
+    padding: 2px 8px; border-radius: 999px;
   }
+  .card .c-status.st-planned   { background: #e4e4e7; color: #3f3f46; }
+  .card .c-status.st-confirmed { background: #d1fae5; color: #047857; }
+  .card .c-status.st-scheduled { background: #dbeafe; color: #1d4ed8; }
+  .card .c-status.st-posted    { background: #111827; color: #f9fafb; }
   .card .c-vp {
     display: inline-block; font-size: 10px; font-weight: 700;
     padding: 2px 7px; border-radius: 999px; background: #1e1b2e; color: #f5d5e6;
   }
+  .card.is-confirmed { border: 1.5px solid #10b981; box-shadow: 0 2px 8px rgba(16,185,129,.18); }
+  .card.is-scheduled { border: 1.5px solid #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,.18); }
   .card.is-posted .c-type,
-  .card.is-posted .c-product { text-decoration: line-through; }
+  .card.is-posted .c-product { text-decoration: line-through; color: #111827; }
   .card.is-posted { opacity: .55; }
+
+  /* Sound source toggle (radio-style buttons) */
+  .toggle-row { display: flex; gap: 8px; }
+  .toggle-row label {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 10px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: 1.5px solid var(--pink-border); border-radius: 10px;
+    background: #fff; color: var(--muted); transition: all .15s ease;
+    margin-bottom: 0;
+  }
+  .toggle-row label.active { background: var(--pink-soft); border-color: var(--pink); color: var(--pink-dark); }
+  .toggle-row input { display: none; }
+
+  /* File input — styled "browse" button */
+  .file-row { display: flex; align-items: center; gap: 8px; }
+  .file-row .file-btn {
+    background: #fff; color: var(--pink-dark); border: 1.5px solid var(--pink-border);
+    padding: 9px 14px; font-size: 13px; font-weight: 600; border-radius: 10px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .file-row .file-btn:hover { background: var(--pink-soft); }
+  .file-row .file-name { font-size: 12.5px; color: var(--muted); flex: 1; word-break: break-all; }
+  .file-row input[type="file"] { display: none; }
+
+  /* Export button + toast */
+  .export-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
+  }
+  .export-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16,185,129,.3); }
+  .btn-confirm {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff; padding: 12px 18px; font-size: 15px; font-weight: 700;
+  }
+  .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(16,185,129,.3); }
+  .toast {
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
+    background: #111827; color: #fff; padding: 12px 20px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 
   .card-actions {
     position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
@@ -226,6 +275,7 @@
   <div class="toolbar">
     <button class="nav-btn" id="prevWeek">← Prev</button>
     <button class="today-btn" id="todayBtn">Today</button>
+    <button class="export-btn" id="exportBtn">📤 Export for Posting</button>
     <button class="nav-btn" id="nextWeek">Next →</button>
     <div class="range" id="rangeLabel">—</div>
   </div>
@@ -264,6 +314,25 @@
         <input type="text" id="f-sound" placeholder="e.g. original sound · #casekisses #fyp" />
       </div>
       <div class="field">
+        <label>Sound source</label>
+        <div class="toggle-row" id="f-soundSource">
+          <label data-val="tiktok" class="active">
+            <input type="radio" name="soundSource" value="tiktok" checked /> Pick from TikTok 🎵
+          </label>
+          <label data-val="preloaded">
+            <input type="radio" name="soundSource" value="preloaded" /> Already in video ✅
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Video file</label>
+        <div class="file-row">
+          <button type="button" class="file-btn" id="f-videoFileBtn">📁 Choose video…</button>
+          <input type="file" id="f-videoFile" accept="video/*" />
+          <span class="file-name" id="f-videoFileName">No file selected</span>
+        </div>
+      </div>
+      <div class="field">
         <label for="f-videoprompt">Video prompt (Kling 3.0 / Seedance)</label>
         <textarea id="f-videoprompt" class="vp" placeholder="Shot-by-shot video prompt…"></textarea>
       </div>
@@ -291,6 +360,9 @@
     </div>
     <pre class="code-box" id="detailVP"></pre>
     <div class="modal-actions" style="flex-wrap: wrap; margin-top: 18px;">
+      <button type="button" class="btn-confirm" id="detailConfirm" style="flex:1;">Confirm for Posting ✅</button>
+    </div>
+    <div class="modal-actions" style="flex-wrap: wrap;">
       <button type="button" class="btn-primary" id="detailPosted">Mark as posted</button>
       <button type="button" class="btn-ghost" id="detailEdit">Edit</button>
       <button type="button" class="btn-danger" id="detailDelete">Delete</button>
@@ -302,6 +374,7 @@
 </div>
 
 <div class="stats" id="stats"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function () {
@@ -315,15 +388,20 @@
     "Dark Girly Aesthetic", "The Heist", "Dog Goes Feral", "Nokia Beat Sync", "Custom"
   ];
   var STATUSES = [
-    { v: "planned", l: "Planned" },
-    { v: "ready", l: "Ready to post" },
-    { v: "posted", l: "Posted" }
+    { v: "planned",   l: "Planned" },
+    { v: "confirmed", l: "Confirmed" },
+    { v: "scheduled", l: "Scheduled" },
+    { v: "posted",    l: "Posted" }
   ];
   var SLOTS = [
-    { id: "7am",  label: "7 AM",  cls: "tint-am" },
-    { id: "11am", label: "11 AM", cls: "tint-mid" },
-    { id: "7pm",  label: "7 PM",  cls: "tint-pm" }
+    { id: "7am",  label: "7 AM",  cls: "tint-am",  time24: "07:00" },
+    { id: "11am", label: "11 AM", cls: "tint-mid", time24: "11:00" },
+    { id: "7pm",  label: "7 PM",  cls: "tint-pm",  time24: "19:00" }
   ];
+  function slotTime24(slotId) {
+    for (var i = 0; i < SLOTS.length; i++) if (SLOTS[i].id === slotId) return SLOTS[i].time24;
+    return "";
+  }
 
   // 7-day content plan, May 19–25 2026. seedPlan() writes this into
   // localStorage on first visit only — it never overwrites user data.
@@ -517,18 +595,23 @@
 
   function buildCard(key, entry) {
     var card = document.createElement("div");
-    var posted = entry.status === "posted";
-    card.className = "card pf-" + entry.platform + (posted ? " is-posted" : "");
+    var status = entry.status || "planned";
+    var stClass = "";
+    if (status === "posted") stClass = " is-posted";
+    else if (status === "confirmed") stClass = " is-confirmed";
+    else if (status === "scheduled") stClass = " is-scheduled";
+    card.className = "card pf-" + entry.platform + stClass;
     card.innerHTML =
       '<div class="c-type">' + esc(entry.archetype) + "</div>" +
       '<div class="c-product">' + esc(entry.product) + "</div>" +
       '<div class="c-meta">' +
-        '<span class="c-status">' + esc(statusLabel(entry.status)) + "</span>" +
+        '<span class="c-status st-' + esc(status) + '">' + esc(statusLabel(status)) + "</span>" +
+        (entry.videoFile ? '<span class="c-vp" title="' + esc(entry.videoFile) + '">📹 video</span>' : "") +
         (entry.videoPrompt ? '<span class="c-vp">🎬 prompt</span>' : "") +
       "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
-        '<button type="button" title="Toggle posted" data-act="posted">' + (posted ? "↺" : "✓") + "</button>" +
+        '<button type="button" title="Toggle posted" data-act="posted">' + (status === "posted" ? "↺" : "✓") + "</button>" +
         '<button type="button" title="Delete" data-act="del">✕</button>' +
       "</div>";
 
@@ -587,6 +670,28 @@
     alert("No empty slots left this week — try next week 🎀");
   }
 
+  // pending video filename for the form being edited — file inputs can't
+  // be programmatically re-populated, so we track the chosen filename here.
+  var pendingVideoFile = "";
+
+  function setSoundSourceUI(val) {
+    var labels = document.querySelectorAll("#f-soundSource label");
+    labels.forEach(function (lab) {
+      var active = lab.getAttribute("data-val") === val;
+      lab.classList.toggle("active", active);
+      var input = lab.querySelector("input");
+      if (input) input.checked = active;
+    });
+  }
+  function getSoundSourceUI() {
+    var checked = document.querySelector('#f-soundSource input[name="soundSource"]:checked');
+    return checked ? checked.value : "tiktok";
+  }
+  function setVideoFileUI(name) {
+    pendingVideoFile = name || "";
+    document.getElementById("f-videoFileName").textContent = pendingVideoFile || "No file selected";
+  }
+
   function openForm(key, presetArchetype) {
     formKey = key;
     var e = data[key];
@@ -598,10 +703,29 @@
     document.getElementById("f-caption").value = e ? (e.caption || "") : "";
     document.getElementById("f-sound").value = e ? (e.sound || "") : "";
     document.getElementById("f-videoprompt").value = e ? (e.videoPrompt || "") : "";
-    document.getElementById("f-status").value = e ? e.status : STATUSES[0].v;
+    document.getElementById("f-status").value = e ? (e.status || "planned") : STATUSES[0].v;
+    setSoundSourceUI(e && e.soundSource ? e.soundSource : "tiktok");
+    setVideoFileUI(e && e.videoFile ? e.videoFile : "");
+    // Reset native file input value so picking the same file twice still fires change.
+    document.getElementById("f-videoFile").value = "";
     closeOverlay("detailOverlay");
     openOverlay("formOverlay");
   }
+
+  // Sound-source toggle clicks (whole label area is the target).
+  document.querySelectorAll("#f-soundSource label").forEach(function (lab) {
+    lab.addEventListener("click", function () { setSoundSourceUI(lab.getAttribute("data-val")); });
+  });
+
+  // Video file: open the hidden file input when the button is clicked,
+  // store only the basename — full paths aren't exposed by the browser anyway.
+  document.getElementById("f-videoFileBtn").addEventListener("click", function () {
+    document.getElementById("f-videoFile").click();
+  });
+  document.getElementById("f-videoFile").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (f) setVideoFileUI(f.name);
+  });
 
   document.getElementById("contentForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -614,6 +738,8 @@
       archetype: document.getElementById("f-archetype").value,
       caption: document.getElementById("f-caption").value.trim(),
       sound: document.getElementById("f-sound").value.trim(),
+      soundSource: getSoundSourceUI(),
+      videoFile: pendingVideoFile,
       videoPrompt: document.getElementById("f-videoprompt").value.trim(),
       status: document.getElementById("f-status").value,
       createdAt: existing && existing.createdAt ? existing.createdAt : Date.now()
@@ -623,6 +749,10 @@
     renderCalendar();
   });
 
+  function soundSourceLabel(v) {
+    if (v === "preloaded") return "Already in video ✅";
+    return "Pick from TikTok 🎵";
+  }
   function openDetail(key) {
     var e = data[key];
     if (!e) return;
@@ -634,10 +764,15 @@
       row("Archetype", e.archetype) +
       row("Caption", e.caption || "—") +
       row("Sound / tags", e.sound || "—") +
+      row("Sound source", soundSourceLabel(e.soundSource || "tiktok")) +
+      row("Video file", e.videoFile || "—") +
       row("Status", statusLabel(e.status));
     document.getElementById("detailVP").textContent = e.videoPrompt || "No video prompt yet.";
     document.getElementById("detailPosted").textContent =
       e.status === "posted" ? "Mark as planned" : "Mark as posted";
+    // The Confirm button is hidden once a card is already confirmed/scheduled/posted.
+    var canConfirm = !e.status || e.status === "planned";
+    document.getElementById("detailConfirm").style.display = canConfirm ? "" : "none";
     closeOverlay("formOverlay");
     openOverlay("detailOverlay");
   }
@@ -666,6 +801,17 @@
       openDetail(key);
     }
   }
+  function confirmEntry(key) {
+    var e = data[key];
+    if (!e) return;
+    e.status = "confirmed";
+    saveData();
+    renderCalendar();
+    showToast("Confirmed for posting ✅");
+    if (detailKey === key && document.getElementById("detailOverlay").classList.contains("open")) {
+      openDetail(key);
+    }
+  }
   function removeEntry(key) {
     if (!data[key]) return;
     if (!confirm("Delete this content card?")) return;
@@ -673,6 +819,61 @@
     saveData();
     closeOverlay("detailOverlay");
     renderCalendar();
+  }
+
+  // ---------- toast ----------
+  var toastTimer = null;
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3200);
+  }
+
+  // ---------- export ----------
+  // Walks the live `data` map (which is the full localStorage payload — all weeks,
+  // not just the visible one) and emits the JSON contract the Python poster expects.
+  function exportForPosting() {
+    var queue = [];
+    Object.keys(data).forEach(function (key) {
+      var e = data[key];
+      if (!e || e.status !== "confirmed") return;
+      var parts = key.split("__");
+      var dateKey = parts[0];
+      var timeKey = parts[1];
+      queue.push({
+        id: e.id,
+        dateKey: dateKey,
+        timeKey: timeKey,
+        platform: e.platform,
+        product: e.product,
+        archetype: e.archetype,
+        caption: e.caption || "",
+        sound: e.sound || "",
+        soundSource: e.soundSource || "tiktok",
+        videoFile: e.videoFile || "",
+        scheduleDate: dateKey,
+        scheduleTime: slotTime24(timeKey),
+        status: e.status
+      });
+    });
+    queue.sort(function (a, b) {
+      if (a.scheduleDate !== b.scheduleDate) return a.scheduleDate < b.scheduleDate ? -1 : 1;
+      return a.scheduleTime < b.scheduleTime ? -1 : 1;
+    });
+
+    var blob = new Blob([JSON.stringify(queue, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "posting-queue.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+
+    showToast("Exported " + queue.length + " posts ready for scheduling 🎀");
   }
 
   // ---------- overlays ----------
@@ -685,6 +886,8 @@
   document.getElementById("detailEdit").addEventListener("click", function () { if (detailKey) openForm(detailKey); });
   document.getElementById("detailDelete").addEventListener("click", function () { if (detailKey) removeEntry(detailKey); });
   document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
+  document.getElementById("detailConfirm").addEventListener("click", function () { if (detailKey) confirmEntry(detailKey); });
+  document.getElementById("exportBtn").addEventListener("click", exportForPosting);
 
   ["formOverlay", "detailOverlay"].forEach(function (id) {
     document.getElementById(id).addEventListener("click", function (ev) {
