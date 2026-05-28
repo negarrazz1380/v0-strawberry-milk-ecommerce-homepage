@@ -131,6 +131,14 @@
     padding: 2px 7px; border-radius: 999px; background: #d1fae5; color: #047857;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .card .c-concept {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; background: var(--pink-soft); color: var(--pink-dark);
+  }
+  .card .c-preset {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; background: #dbeafe; color: #1d4ed8;
+  }
   .card .c-filename {
     display: flex; align-items: center; gap: 6px; margin-top: 8px;
     background: #f4f4f5; color: #52525b;
@@ -499,12 +507,81 @@
     }, 1000);
   }
 
+  // Marketing Studio preset + default video prompt for each archetype.
+  // Prompts use [CASE] as a placeholder for the product name on the card.
+  var PRESET_MAP = {
+    "ASMR Unboxing": "Unboxing",
+    "Before/After Ugly Case": "Product Review",
+    "POV Outfit Match": "UGC Virtual Try On",
+    "Girl Math Comedy": "UGC",
+    "Cases I've Been Gatekeeping": "UGC",
+    "Which One Matches Your Vibe": "UGC",
+    "Rate My Phone Setup": "UGC",
+    "Stitch Bait": "UGC",
+    "GRWM Morning Routine": "UGC",
+    "Satisfying Loop Click": "Hyper Motion",
+    "Small Business BTS": "UGC",
+    "Fruit Case Trend": "Product Review",
+    "My Boyfriend Hates It": "UGC",
+    "IT Girl Phone Check": "UGC",
+    "Canadian Small Business": "UGC",
+    "Compliment Magnet": "UGC",
+    "Nostalgia Hit": "Wild Card",
+    "Unboxing Surprise Gift": "Unboxing",
+    "Hand Covers Camera Transition": "Hyper Motion",
+    "Outfit Swap Transition": "UGC Virtual Try On",
+    "Falling Phone Transition": "Wild Card",
+    "PR Package Haul": "Unboxing",
+    "Influencer Ranking Haul": "Product Review",
+    "Honest Review 2 Weeks": "Product Review",
+    "Not Gatekeeping": "UGC",
+    "Should Be Illegal Hook": "UGC",
+    "Founder Story": "UGC",
+    "Didn't Know This Existed": "UGC"
+  };
+  var PROMPT_TEMPLATES = {
+    "ASMR Unboxing": "A woman with nude nail polish carefully opens a pink cardboard mailer box on a white kitchen counter. She taps her fingernails on the box four times, slowly scrunches the white tissue paper inside, lifts out the phone case and taps her nail on it three times, slides a Visa debit card into the card slot, then presses the case onto an iPhone. Morning window light from the left. Slow and satisfying. No talking.",
+    "Before/After Ugly Case": "A woman holds up a cracked scratched plain black rubber phone case toward the camera on a wooden desk with warm lamp light. Hard cut. Same desk same hand now holding the [CASE] phone case. She tilts it left and right to show it off then sets it down on the desk. Short sharp and satisfying. No talking.",
+    "POV Outfit Match": "A woman in 4 different outfits — white linen shirt and jeans, all black, pink floral dress, grey hoodie — holds the [CASE] phone case beside each outfit against a white wall showing it matches everything. Quick cuts between outfits. Clean natural daylight. No talking.",
+    "Girl Math Comedy": "A woman looks directly into camera with a serious face and says: girl math says this phone case is basically free because you will use it every single day for a year which makes it less than one cent per day. She holds up the [CASE] case and shrugs. Funny and confident. Bedroom background.",
+    "Cases I've Been Gatekeeping": "A woman leans toward the camera like she is telling a secret and says: okay I have been gatekeeping this for too long. She holds up the [CASE] phone case slowly and turns it around. She shakes her head like she can not believe how good it is. Casual kitchen or bedroom background.",
+    "Which One Matches Your Vibe": "Five phone cases are placed one by one flat on a white marble kitchen counter by a woman's hand with nude nail polish. Camera slowly pulls back from above to show all five in a row. Clean overhead shot. Natural daylight. No talking. Comment bait energy.",
+    "Rate My Phone Setup": "An aesthetic desk setup — MacBook, latte, journal, AirPods, small plant. A woman's hand places the [CASE] phone case in the center of the desk. Camera slowly pulls back to show the full setup. The case is the hero of the shot. Warm desk lamp light. No talking.",
+    "Stitch Bait": "A woman looks into camera and says: comment your current phone case and I will find you a Case Kisses match. She holds up the [CASE] case beside her face. Direct confident energy. Plain background. Under 10 seconds.",
+    "GRWM Morning Routine": "A woman does her morning routine in a bright bedroom — applies lip gloss, picks up her coffee, grabs her phone which has the [CASE] case on it. She holds the phone up naturally at the end. Feels real and unscripted. Morning light. No hard sell.",
+    "Satisfying Loop Click": "Extreme close-up of the [CASE] phone case snapping perfectly onto an iPhone in slow motion. The click as it locks into place. Then off. Then back on again. Perfect satisfying loop. White surface. Soft pink light. Macro feel. No talking.",
+    "Small Business BTS": "A young woman sits at a desk surrounded by pink packaging materials, phone cases and stickers. She carefully packs orders one by one. She looks up at the camera and smiles. Real and authentic. Warm desk lamp light. A small fluffy white kitten sits on the corner of the desk watching her work.",
+    "Fruit Case Trend": "A woman holds the [CASE] phone case next to a bowl of fresh red cherries on a white kitchen counter. She looks at the camera with a knowing smirk. She holds the case close to the camera showing the design. Bright natural light. Fun and playful. No talking.",
+    "My Boyfriend Hates It": "A woman holds up the [CASE] phone case proudly toward the camera. She mouths the words: he said it was too much. She shrugs and puts it on her phone anyway completely unbothered. She holds the phone up showing the case to camera and winks. Bright natural light.",
+    "IT Girl Phone Check": "A woman in a silk top with gold jewelry pulls her phone out of her bag and holds it up showing the [CASE] case. She does not say anything. Just looks at the camera like she knows it is perfect. Neutral beige background. Clean editorial energy. Feels expensive.",
+    "Canadian Small Business": "A woman holds up three phone cases toward the camera one by one. She mouths: made in Canada ships everywhere. She smiles genuinely. Clean white background. Warm and real. Canadian pride energy without being cheesy.",
+    "Compliment Magnet": "A woman walks down a street holding her phone naturally showing the [CASE] case. Another woman taps her on the shoulder and points at the phone case mouthing where did you get that. She smiles and holds the case up to camera. Warm outdoor afternoon light. Natural and candid.",
+    "Nostalgia Hit": "A woman sits on a bed holding her phone showing the [CASE] case. She looks at it then looks at the camera with pure nostalgia and emotion. Behind her on a shelf are childhood toys and a Nintendo console. Warm nostalgic lighting. Emotional and funny. Under 15 seconds.",
+    "Unboxing Surprise Gift": "A woman receives a pink gift bag tied with a ribbon. She opens it and pulls out the [CASE] phone case wrapped in pink tissue paper. Her reaction goes from curious to genuinely delighted. She immediately puts it on her phone and holds it up to camera. Warm natural light. Feels like a real gift moment.",
+    "Hand Covers Camera Transition": "A woman's hand slowly moves toward the camera lens until it completely covers it and the screen goes dark. The hand pulls away to reveal her iPhone now wearing the [CASE] case. She holds it up confidently. Clean white background. Seamless and satisfying. Under 8 seconds.",
+    "Outfit Swap Transition": "A woman in a casual outfit holds her phone showing the [CASE] case. She spins toward the camera and on the other side of the spin she is in a completely different elevated outfit but the same case is on her phone. She holds it up again. Same case two completely different vibes. Both work.",
+    "Falling Phone Transition": "A woman holds her plain phone without a case and drops it toward the camera in slow motion. Before it hits the ground the video cuts to her catching it with the [CASE] case now on it. She holds it up and laughs. The drop is the transition. Funny and satisfying. Under 8 seconds.",
+    "PR Package Haul": "A woman sits at a clean desk. A pink branded box labeled Case Kisses sits in front of her. She opens it slowly and inside are three phone cases nestled in pink tissue paper. She pulls each one out one by one holds it up to camera and examines it with genuine delight. She lines all three up at the end. Pure ASMR unboxing energy. No talking.",
+    "Influencer Ranking Haul": "A woman sits casually in front of camera like she is making a haul video. She holds up each of four phone cases one at a time and reacts — some she loves immediately, one she debates, one makes her jaw drop. She physically ranks them from left to right placing the favorite on the right. She points at the winner and nods. Authentic haul energy.",
+    "Honest Review 2 Weeks": "A woman holds the [CASE] case up to camera and speaks directly: okay I have had this case for two weeks and I need to talk about it. She shows the card slot, shows the lanyard or charm, shows how it looks on the phone. Genuine and unscripted. Ends with her nodding like yeah it is worth it. Casual bedroom setting.",
+    "Not Gatekeeping": "A woman leans toward camera like she is telling her best friend a secret and says: things I will never gatekeep — number one. She slowly holds up the [CASE] phone case and turns it around. She looks back at camera and says link in bio. Casual confident under 15 seconds.",
+    "Should Be Illegal Hook": "A woman looks dead into camera very seriously and says: this case should be illegal. I am not joking. She slowly holds up the [CASE] case toward the camera. The charm or detail swings. She watches the camera and says yeah I know. Deadpan comedy energy. Under 10 seconds.",
+    "Founder Story": "A young woman sits at her desk surrounded by her phone cases. She looks into camera and speaks genuinely: I started Case Kisses from my bedroom in Canada because I could not find cute cases that actually had personality. So I made them myself. This is what I have been building. She picks up one case and holds it up. Warm desk lamp light. Real and vulnerable.",
+    "Didn't Know This Existed": "A woman looks at camera with genuine surprise and says: am I literally the only one who did not know Case Kisses existed? She holds up the [CASE] case and the charm swings. She turns it around showing the back. She looks back at camera: the detail alone... She trails off and shakes her head. Relatable discovery energy. Under 15 seconds."
+  };
+  function presetFor(archetype) {
+    return PRESET_MAP[archetype] || "";
+  }
+  function defaultPromptFor(archetype, product) {
+    var tpl = PROMPT_TEMPLATES[archetype] || "";
+    return tpl.replace(/\[CASE\]/g, product || "");
+  }
+
   // 28-day content plan, May 27 – Jun 23 2026. 28 archetypes spread
   // across the month — no format repeats more than twice per week.
-  // sound and videoPrompt are intentionally blank — pick weekly sounds +
-  // write prompts manually per card. seedPlan() runs once per version
-  // gate; v9 syncs archetypes onto existing entries (preserving user edits).
-  // Filenames are computed at render time from product/archetype/date.
+  // SEED keeps videoPrompt blank; seedPlan() renders the default prompt from
+  // PROMPT_TEMPLATES at seed time (with [CASE] → product). v10 also writes
+  // a `preset` field on every card. Filenames are computed at render time.
   var SEED = [
     { date: "2026-05-27", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "ASMR Unboxing", caption: "the pink box opening is sending me 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
     { date: "2026-05-27", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "before vs after my phone met its match 📱➡️🎀 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
@@ -598,13 +675,13 @@
   var detailKey = null;
 
   // ---------- seed ----------
-  // Versioned gate: runs once per version. For existing slots, syncs the
-  // archetype field from SEED (so format updates propagate) while preserving
-  // user edits to caption / sound / videoPrompt / videoFile / status. Empty
-  // slots get a full SEED insert.
+  // Versioned gate: runs once per version. For existing slots, syncs archetype
+  // + preset from SEED and back-fills an empty videoPrompt with the default
+  // template prompt — user-written prompts are never overwritten. Empty slots
+  // get a full SEED insert with preset + rendered videoPrompt.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v9"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v10"); } catch (e) { return; }
     if (seeded != null) return;
 
     var existing = {};
@@ -616,25 +693,30 @@
 
     SEED.forEach(function (s) {
       var key = s.date + "__" + s.slot;
+      var preset = presetFor(s.archetype);
+      var prompt = defaultPromptFor(s.archetype, s.product);
       var cur = existing[key];
       if (cur) {
         cur.archetype = s.archetype;
+        cur.preset = preset;
+        if (!cur.videoPrompt) cur.videoPrompt = prompt;
       } else {
         existing[key] = {
           id: "c_" + Math.random().toString(36).slice(2, 10),
           platform: s.platform,
           product: s.product,
           archetype: s.archetype,
+          preset: preset,
           caption: s.caption,
           sound: s.sound,
-          videoPrompt: s.videoPrompt,
+          videoPrompt: prompt,
           status: "planned",
           createdAt: Date.now()
         };
       }
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v9", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v10", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -774,11 +856,15 @@
     else if (status === "scheduled") stClass = " is-scheduled";
     card.className = "card pf-" + entry.platform + stClass;
     var filename = generateFilename(entry, key);
+    var conceptNum = conceptNumber(entry.archetype);
+    var preset = entry.preset || presetFor(entry.archetype);
     card.innerHTML =
       '<div class="c-type">' + esc(entry.archetype) + "</div>" +
       '<div class="c-product">' + esc(entry.product) + "</div>" +
       '<div class="c-meta">' +
         '<span class="c-status st-' + esc(status) + '">' + esc(statusLabel(status)) + "</span>" +
+        (conceptNum ? '<span class="c-concept">C' + conceptNum + "</span>" : "") +
+        (preset ? '<span class="c-preset">' + esc(preset) + "</span>" : "") +
         (entry.videoFile ? '<span class="c-video" title="' + esc(entry.videoFile) + '">🎬 ' + esc(entry.videoFile) + '</span>' : "") +
         (entry.videoPrompt ? '<span class="c-vp">📝 prompt</span>' : "") +
       "</div>" +
@@ -917,11 +1003,13 @@
     ev.preventDefault();
     if (!formKey) return;
     var existing = data[formKey];
+    var chosenArchetype = document.getElementById("f-archetype").value;
     data[formKey] = {
       id: existing && existing.id ? existing.id : "c_" + Math.random().toString(36).slice(2, 10),
       platform: document.getElementById("f-platform").value,
       product: document.getElementById("f-product").value,
-      archetype: document.getElementById("f-archetype").value,
+      archetype: chosenArchetype,
+      preset: presetFor(chosenArchetype),
       caption: document.getElementById("f-caption").value.trim(),
       sound: document.getElementById("f-sound").value.trim(),
       soundSource: getSoundSourceUI(),
@@ -948,6 +1036,7 @@
       row("Platform", e.platform) +
       row("Product", e.product) +
       row("Archetype", e.archetype) +
+      row("Preset", e.preset || presetFor(e.archetype) || "—") +
       row("Caption", e.caption || "—") +
       row("Sound / tags", e.sound || "—") +
       row("Sound source", soundSourceLabel(e.soundSource || "tiktok")) +
