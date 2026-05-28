@@ -131,6 +131,34 @@
     padding: 2px 7px; border-radius: 999px; background: #d1fae5; color: #047857;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .card .c-filename {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    background: #f4f4f5; color: #52525b;
+    padding: 4px 4px 4px 8px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; font-weight: 600;
+    transition: background .15s ease, color .15s ease;
+  }
+  .card .c-filename .fn-text {
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card .c-filename .fn-copy {
+    width: 22px; height: 22px; padding: 0; flex-shrink: 0;
+    border: 1px solid #d4d4d8; background: #fff; color: #52525b;
+    border-radius: 5px; font-size: 11px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .card .c-filename .fn-copy:hover { background: #e4e4e7; }
+  .card .c-filename.copied { background: #d1fae5; color: #047857; }
+  .card .c-filename.copied .fn-copy { background: #10b981; color: #fff; border-color: #10b981; }
+
+  .filename-display {
+    background: #f4f4f5; color: #3f3f46;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13.5px; font-weight: 600;
+    padding: 12px 14px; border-radius: 8px; border: 1px solid #e4e4e7;
+    word-break: break-all;
+  }
   .card.is-confirmed { border: 1.5px solid #10b981; box-shadow: 0 2px 8px rgba(16,185,129,.18); }
   .card.is-scheduled { border: 1.5px solid #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,.18); }
   .card.is-posted .c-type,
@@ -360,6 +388,11 @@
     <p class="ctx" id="detailCtx"></p>
     <div id="detailBody"></div>
     <div class="vp-label">
+      <span>File Name</span>
+      <button type="button" class="copy-btn" id="detailCopyFn">Copy Filename</button>
+    </div>
+    <div class="filename-display" id="detailFn"></div>
+    <div class="vp-label">
       <span>Video prompt</span>
       <button type="button" class="copy-btn" id="detailCopyVP">Copy prompt</button>
     </div>
@@ -416,11 +449,62 @@
     return "";
   }
 
+  // Auto-generated filename = CK_[case]_c[archetype#]_w[week].mp4. Computed
+  // at render time from the card's current product / archetype / date so it
+  // stays in sync if any of those fields are edited later.
+  var CASE_SLUGS = {
+    "Dachshund": "dachshund",
+    "Hello Kitty Cherry": "hellokitty",
+    "Mario": "mario",
+    "Bow Cherry": "bowcherry",
+    "Cherry": "cherry",
+    "Wavy": "wavy",
+    "Puppy": "puppy",
+    "Burger": "burger",
+    "Butter Bear": "butterbear",
+    "Bow Diamond": "bowdiamond"
+  };
+  function caseSlug(product) {
+    return CASE_SLUGS[product] || String(product || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+  function conceptNumber(archetype) {
+    for (var i = 0; i < ARCHETYPES.length; i++) if (ARCHETYPES[i] === archetype) return i + 1;
+    return 0;
+  }
+  // w1 = May 27–Jun 2 2026. Each subsequent 7-day block is w2, w3, …
+  function weekNumber(dateStr) {
+    if (!dateStr) return 0;
+    var parts = dateStr.split("-");
+    var d = Date.UTC(+parts[0], +parts[1] - 1, +parts[2]);
+    var base = Date.UTC(2026, 4, 27);
+    var diff = Math.floor((d - base) / 86400000);
+    if (diff < 0) return 0;
+    return Math.floor(diff / 7) + 1;
+  }
+  function generateFilename(entry, key) {
+    var dateStr = key ? key.split("__")[0] : "";
+    return "CK_" + caseSlug(entry.product) + "_c" + conceptNumber(entry.archetype) +
+           "_w" + weekNumber(dateStr) + ".mp4";
+  }
+  function flashCopied(box) {
+    if (!box) return;
+    var span = box.querySelector(".fn-text");
+    if (!span) return;
+    var original = span.textContent;
+    box.classList.add("copied");
+    span.textContent = "✓ Copied!";
+    setTimeout(function () {
+      box.classList.remove("copied");
+      span.textContent = original;
+    }, 1000);
+  }
+
   // 28-day content plan, May 27 – Jun 23 2026. 28 archetypes spread
   // across the month — no format repeats more than twice per week.
   // sound and videoPrompt are intentionally blank — pick weekly sounds +
   // write prompts manually per card. seedPlan() runs once per version
-  // gate; v8 syncs archetypes onto existing entries (preserving user edits).
+  // gate; v9 syncs archetypes onto existing entries (preserving user edits).
+  // Filenames are computed at render time from product/archetype/date.
   var SEED = [
     { date: "2026-05-27", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "ASMR Unboxing", caption: "the pink box opening is sending me 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
     { date: "2026-05-27", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "before vs after my phone met its match 📱➡️🎀 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
@@ -520,7 +604,7 @@
   // slots get a full SEED insert.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v8"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v9"); } catch (e) { return; }
     if (seeded != null) return;
 
     var existing = {};
@@ -550,7 +634,7 @@
       }
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v8", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v9", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -689,6 +773,7 @@
     else if (status === "confirmed") stClass = " is-confirmed";
     else if (status === "scheduled") stClass = " is-scheduled";
     card.className = "card pf-" + entry.platform + stClass;
+    var filename = generateFilename(entry, key);
     card.innerHTML =
       '<div class="c-type">' + esc(entry.archetype) + "</div>" +
       '<div class="c-product">' + esc(entry.product) + "</div>" +
@@ -696,6 +781,10 @@
         '<span class="c-status st-' + esc(status) + '">' + esc(statusLabel(status)) + "</span>" +
         (entry.videoFile ? '<span class="c-video" title="' + esc(entry.videoFile) + '">🎬 ' + esc(entry.videoFile) + '</span>' : "") +
         (entry.videoPrompt ? '<span class="c-vp">📝 prompt</span>' : "") +
+      "</div>" +
+      '<div class="c-filename">' +
+        '<span class="fn-text" title="' + esc(filename) + '">' + esc(filename) + "</span>" +
+        '<button type="button" class="fn-copy" title="Copy filename" aria-label="Copy filename">📋</button>' +
       "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
@@ -713,6 +802,15 @@
         else if (act === "del") removeEntry(key);
       });
     });
+    var fnBox = card.querySelector(".c-filename");
+    var fnCopyBtn = card.querySelector(".fn-copy");
+    if (fnCopyBtn) {
+      fnCopyBtn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(filename).then(function () { flashCopied(fnBox); });
+      });
+    }
     return card;
   }
 
@@ -855,6 +953,7 @@
       row("Sound source", soundSourceLabel(e.soundSource || "tiktok")) +
       row("Video file", e.videoFile || "—") +
       row("Status", statusLabel(e.status));
+    document.getElementById("detailFn").textContent = generateFilename(e, key);
     document.getElementById("detailVP").textContent = e.videoPrompt || "No video prompt yet.";
     document.getElementById("detailPosted").textContent =
       e.status === "posted" ? "Mark as planned" : "Mark as posted";
@@ -876,6 +975,17 @@
       btn.classList.add("copied");
       btn.textContent = "✓ Copied!";
       setTimeout(function () { btn.classList.remove("copied"); btn.textContent = "Copy prompt"; }, 2000);
+    });
+  });
+
+  document.getElementById("detailCopyFn").addEventListener("click", function () {
+    var btn = this;
+    var text = document.getElementById("detailFn").textContent;
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add("copied");
+      btn.textContent = "✓ Copied!";
+      setTimeout(function () { btn.classList.remove("copied"); btn.textContent = "Copy Filename"; }, 1000);
     });
   });
 
