@@ -449,7 +449,7 @@
     return "";
   }
 
-  // Auto-generated filename = CK_[case]_c[archetype#]_w[week].mp4. Computed
+  // Auto-generated filename = CK_[case]_c[archetype#]_w[week] (no extension). Computed
   // at render time from the card's current product / archetype / date so it
   // stays in sync if any of those fields are edited later.
   var CASE_SLUGS = {
@@ -484,7 +484,7 @@
   function generateFilename(entry, key) {
     var dateStr = key ? key.split("__")[0] : "";
     return "CK_" + caseSlug(entry.product) + "_c" + conceptNumber(entry.archetype) +
-           "_w" + weekNumber(dateStr) + ".mp4";
+           "_w" + weekNumber(dateStr);
   }
   function flashCopied(box) {
     if (!box) return;
