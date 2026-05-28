@@ -126,6 +126,11 @@
     display: inline-block; font-size: 10px; font-weight: 700;
     padding: 2px 7px; border-radius: 999px; background: #1e1b2e; color: #f5d5e6;
   }
+  .card .c-video {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 999px; background: #d1fae5; color: #047857;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .card.is-confirmed { border: 1.5px solid #10b981; box-shadow: 0 2px 8px rgba(16,185,129,.18); }
   .card.is-scheduled { border: 1.5px solid #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,.18); }
   .card.is-posted .c-type,
@@ -388,7 +393,12 @@
   ];
   var ARCHETYPES = [
     "ASMR Unboxing", "Before/After Ugly Case", "POV Outfit Match", "Girl Math Comedy",
-    "Cases I've Been Gatekeeping", "Which One Matches Your Vibe", "Rate My Phone Setup", "Stitch Bait"
+    "Cases I've Been Gatekeeping", "Which One Matches Your Vibe", "Rate My Phone Setup", "Stitch Bait",
+    "GRWM Morning Routine", "Satisfying Loop Click", "Small Business BTS", "Fruit Case Trend",
+    "My Boyfriend Hates It", "IT Girl Phone Check", "Canadian Small Business", "Compliment Magnet",
+    "Nostalgia Hit", "Unboxing Surprise Gift", "Hand Covers Camera Transition", "Outfit Swap Transition",
+    "Falling Phone Transition", "PR Package Haul", "Influencer Ranking Haul", "Honest Review 2 Weeks",
+    "Not Gatekeeping", "Should Be Illegal Hook", "Founder Story", "Didn't Know This Existed"
   ];
   var STATUSES = [
     { v: "planned",   l: "Planned" },
@@ -409,7 +419,7 @@
   // 28-day content plan, May 27 – Jun 23 2026. 8 rotating formats,
   // Case 1–10 placeholders. sound and videoPrompt are intentionally
   // blank — pick weekly sounds + write prompts manually per card.
-  // seedPlan() writes this only when ck_calendar_seeded_v6 is unset.
+  // seedPlan() writes this only when ck_calendar_seeded_v7 is unset.
   var SEED = [
     { date: "2026-05-27", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "ASMR Unboxing", caption: "the pink box opening is sending me 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
     { date: "2026-05-27", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "before vs after my phone met its match 📱➡️🎀 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
@@ -503,16 +513,24 @@
   var detailKey = null;
 
   // ---------- seed ----------
+  // Versioned gate: runs once per version. Merges SEED into empty slots only —
+  // existing user cards (from prior seeds or manual edits) are preserved.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v6"); } catch (e) { return; }
-    // Versioned seed gate: skip once v4 has been written. First run
-    // overwrites any prior ck_calendar payload.
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v7"); } catch (e) { return; }
     if (seeded != null) return;
 
-    var seedMap = {};
+    var existing = {};
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object") existing = parsed;
+    } catch (e) { /* ignore */ }
+
     SEED.forEach(function (s) {
-      seedMap[s.date + "__" + s.slot] = {
+      var key = s.date + "__" + s.slot;
+      if (existing[key]) return;
+      existing[key] = {
         id: "c_" + Math.random().toString(36).slice(2, 10),
         platform: s.platform,
         product: s.product,
@@ -524,8 +542,8 @@
         createdAt: Date.now()
       };
     });
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(seedMap)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v6", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v7", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -669,8 +687,8 @@
       '<div class="c-product">' + esc(entry.product) + "</div>" +
       '<div class="c-meta">' +
         '<span class="c-status st-' + esc(status) + '">' + esc(statusLabel(status)) + "</span>" +
-        (entry.videoFile ? '<span class="c-vp" title="' + esc(entry.videoFile) + '">📹 video</span>' : "") +
-        (entry.videoPrompt ? '<span class="c-vp">🎬 prompt</span>' : "") +
+        (entry.videoFile ? '<span class="c-video" title="' + esc(entry.videoFile) + '">🎬 ' + esc(entry.videoFile) + '</span>' : "") +
+        (entry.videoPrompt ? '<span class="c-vp">📝 prompt</span>' : "") +
       "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
