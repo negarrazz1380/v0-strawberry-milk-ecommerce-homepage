@@ -300,6 +300,55 @@
   .dot.ig { background: var(--instagram); }
   .dot.bo { background: var(--both); }
 
+  /* Video shoot list — derived from every card's case + archetype combo.
+     Sits in normal flow below the calendar; body's 96px bottom padding keeps
+     the last group visible above the fixed stats bar. */
+  .shoot-list {
+    background: #fff; border: 1.5px solid var(--pink-border);
+    border-radius: 18px; margin: 28px 0 24px;
+    overflow: hidden;
+  }
+  .shoot-list .sl-head {
+    background: var(--pink-soft); padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    border-bottom: 1.5px solid var(--pink-border);
+  }
+  .shoot-list .sl-head h2 { font-size: 22px; color: var(--pink-dark); }
+  .shoot-list .sl-count {
+    padding: 12px 18px 0; color: var(--muted); font-size: 13px; font-weight: 600;
+  }
+  .shoot-list .sl-body { padding: 8px 18px 18px; }
+  .shoot-list .sl-empty {
+    color: var(--muted); font-style: italic; padding: 12px 0; font-size: 14px;
+  }
+  .shoot-list .sl-group { margin-top: 16px; }
+  .shoot-list .sl-group:first-child { margin-top: 6px; }
+  .shoot-list .sl-group-head {
+    font-family: "DM Serif Display", serif; font-size: 16px;
+    color: var(--pink-dark); letter-spacing: .04em;
+    border-bottom: 1px solid var(--pink-border);
+    padding-bottom: 4px; margin-bottom: 6px;
+  }
+  .shoot-list .sl-list { list-style: none; padding: 0; margin: 0; }
+  .shoot-list .sl-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; border-bottom: 1px dashed #f4f4f5;
+  }
+  .shoot-list .sl-item:last-child { border-bottom: none; }
+  .shoot-list .sl-name {
+    flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; color: var(--ink); word-break: break-all;
+  }
+  .shoot-list .sl-copy {
+    width: 28px; height: 28px; padding: 0; flex-shrink: 0;
+    border: 1px solid #d4d4d8; background: #fff; color: #52525b;
+    border-radius: 6px; font-size: 12px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .shoot-list .sl-copy:hover { background: #e4e4e7; }
+  .shoot-list .sl-copy.copied { background: #10b981; color: #fff; border-color: #10b981; }
+
   @media (max-width: 640px) {
     header.page-head h1 { font-size: 28px; }
     .modal { padding: 20px; }
@@ -326,6 +375,15 @@
   <div class="grid-scroll">
     <div class="grid" id="grid"></div>
   </div>
+
+  <section class="shoot-list" id="shootList">
+    <div class="sl-head">
+      <h2>🎬 Video Shoot List</h2>
+      <button type="button" class="copy-btn" id="shootListCopyAll">Copy All</button>
+    </div>
+    <p class="sl-count" id="shootListCount">—</p>
+    <div class="sl-body" id="shootListBody"></div>
+  </section>
 </div>
 
 <!-- Add / Edit modal -->
@@ -486,8 +544,46 @@
     "Bow Diamond": "bowdiamond"
   };
   var DAY_ABBREVS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  // Short slugs used for the shoot list filename ([case]_[archetype].mp4). Each
+  // unique case+archetype combo across the calendar = one video to film.
+  var ARCHETYPE_SLUGS = {
+    "ASMR Unboxing": "asmr",
+    "Before/After Ugly Case": "beforeafter",
+    "POV Outfit Match": "povoutfit",
+    "Girl Math Comedy": "girlmath",
+    "Cases I've Been Gatekeeping": "gatekeeping",
+    "Which One Matches Your Vibe": "whichvibe",
+    "Rate My Phone Setup": "ratesetup",
+    "Stitch Bait": "stitchbait",
+    "GRWM Morning Routine": "grwm",
+    "Satisfying Loop Click": "loopclick",
+    "Small Business BTS": "smallbiz",
+    "Fruit Case Trend": "fruit",
+    "My Boyfriend Hates It": "bfhates",
+    "IT Girl Phone Check": "itgirl",
+    "Canadian Small Business": "canadian",
+    "Compliment Magnet": "compliment",
+    "Nostalgia Hit": "nostalgia",
+    "Unboxing Surprise Gift": "giftunbox",
+    "Hand Covers Camera Transition": "handtrans",
+    "Outfit Swap Transition": "outfitswap",
+    "Falling Phone Transition": "fallingphone",
+    "PR Package Haul": "prhaul",
+    "Influencer Ranking Haul": "ranking",
+    "Honest Review 2 Weeks": "honestrev",
+    "Not Gatekeeping": "notgatekeeping",
+    "Should Be Illegal Hook": "illegal",
+    "Founder Story": "founder",
+    "Didn't Know This Existed": "didntknow"
+  };
   function caseSlug(product) {
     return CASE_SLUGS[product] || String(product || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+  function archetypeSlug(archetype) {
+    return ARCHETYPE_SLUGS[archetype] || String(archetype || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+  function shootFilename(product, archetype) {
+    return caseSlug(product) + "_" + archetypeSlug(archetype) + ".mp4";
   }
   function conceptNumber(archetype) {
     for (var i = 0; i < ARCHETYPES.length; i++) if (ARCHETYPES[i] === archetype) return i + 1;
@@ -830,6 +926,7 @@
     renderChips();
     renderGrid();
     renderStats();
+    renderShootList();
   }
 
   function renderChips() {
@@ -969,6 +1066,91 @@
   }
   function stat(num, lbl) {
     return '<div class="stat"><div class="num">' + num + '</div><div class="lbl">' + lbl + "</div></div>";
+  }
+
+  // Walk every card in storage (all weeks), group unique case+archetype combos by
+  // product. Iterating PRODUCTS preserves the intentional case ordering on the page.
+  function collectShootGroups() {
+    var totalSlots = 0;
+    var byProduct = {};
+    Object.keys(data).forEach(function (key) {
+      var e = data[key];
+      if (!e || !e.product || !e.archetype) return;
+      totalSlots++;
+      var fn = shootFilename(e.product, e.archetype);
+      if (!byProduct[e.product]) byProduct[e.product] = {};
+      byProduct[e.product][fn] = true;
+    });
+    var groups = [];
+    var uniqueCount = 0;
+    PRODUCTS.forEach(function (p) {
+      if (!byProduct[p]) return;
+      var names = Object.keys(byProduct[p]).sort();
+      uniqueCount += names.length;
+      groups.push({ product: p, names: names });
+      delete byProduct[p];
+    });
+    // Catch any custom product not in PRODUCTS, alphabetised at the end.
+    Object.keys(byProduct).sort().forEach(function (p) {
+      var names = Object.keys(byProduct[p]).sort();
+      uniqueCount += names.length;
+      groups.push({ product: p, names: names });
+    });
+    return { groups: groups, uniqueCount: uniqueCount, totalSlots: totalSlots };
+  }
+
+  function renderShootList() {
+    var result = collectShootGroups();
+    var countEl = document.getElementById("shootListCount");
+    var bodyEl = document.getElementById("shootListBody");
+    if (!countEl || !bodyEl) return;
+
+    countEl.textContent =
+      result.uniqueCount + " unique video" + (result.uniqueCount === 1 ? "" : "s") +
+      " needed across " + result.totalSlots + " slot" + (result.totalSlots === 1 ? "" : "s");
+
+    if (!result.groups.length) {
+      bodyEl.innerHTML = '<p class="sl-empty">No cards yet — add a slot above to build your shoot list.</p>';
+      return;
+    }
+    var html = "";
+    result.groups.forEach(function (g) {
+      html += '<div class="sl-group">' +
+        '<div class="sl-group-head">' + esc(g.product.toUpperCase()) + '</div>' +
+        '<ul class="sl-list">';
+      g.names.forEach(function (fn) {
+        html += '<li class="sl-item">' +
+          '<span class="sl-name">' + esc(fn) + '</span>' +
+          '<button type="button" class="sl-copy" data-fn="' + esc(fn) +
+          '" title="Copy filename" aria-label="Copy filename">📋</button>' +
+          '</li>';
+      });
+      html += '</ul></div>';
+    });
+    bodyEl.innerHTML = html;
+
+    bodyEl.querySelectorAll(".sl-copy").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.dataset.fn;
+        if (!text || !navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(function () {
+          btn.textContent = "✓";
+          btn.classList.add("copied");
+          setTimeout(function () {
+            btn.textContent = "📋";
+            btn.classList.remove("copied");
+          }, 1000);
+        });
+      });
+    });
+  }
+
+  function shootListText() {
+    var result = collectShootGroups();
+    return result.groups.map(function (g) {
+      return g.product.toUpperCase() + "\n" +
+        g.names.map(function (n) { return "- " + n; }).join("\n");
+    }).join("\n\n");
   }
 
   // ---------- actions ----------
@@ -1230,6 +1412,19 @@
   document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
   document.getElementById("detailConfirm").addEventListener("click", function () { if (detailKey) confirmEntry(detailKey); });
   document.getElementById("exportBtn").addEventListener("click", exportForPosting);
+
+  document.getElementById("shootListCopyAll").addEventListener("click", function () {
+    var btn = this;
+    var text = shootListText();
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add("copied");
+      var orig = btn.textContent;
+      btn.textContent = "✓ Copied!";
+      setTimeout(function () { btn.classList.remove("copied"); btn.textContent = orig; }, 1500);
+      showToast("Shoot list copied to clipboard 🎬");
+    });
+  });
 
   ["formOverlay", "detailOverlay"].forEach(function (id) {
     document.getElementById(id).addEventListener("click", function (ev) {
