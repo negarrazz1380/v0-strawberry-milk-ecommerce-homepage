@@ -26,6 +26,7 @@ import os
 import random
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -194,14 +195,216 @@ def dismiss_popups(driver) -> None:
             pass
 
 
-def choose_schedule(driver, date_str: str = "", time_str: str = "") -> None:
-    """Toggle the Schedule radio and let TikTok auto-fill date/time.
+MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
 
-    We intentionally do not touch the date or time inputs — TikTok
-    auto-fills today + 19:40, and any input we tried to inject opened
-    pickers that were unreliable to dismiss. date_str/time_str are
-    accepted for backward compatibility but ignored.
+
+def _click_value_in_picker(driver, value: str) -> bool:
+    """Click the first visible element whose text exactly matches value
+    or its non-zero-padded form. Used for the time picker's hour/minute
+    columns where each cell is a numeric label."""
+    forms = {value, value.lstrip("0") or "0"}
+    for form in forms:
+        for el in driver.find_elements(
+            By.XPATH, f"//*[normalize-space(text())='{form}']"
+        ):
+            try:
+                if not el.is_displayed():
+                    continue
+                driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'})", el
+                )
+                time.sleep(0.3)
+                driver.execute_script("arguments[0].click()", el)
+                return True
+            except Exception:
+                continue
+    return False
+
+
+def set_schedule_time(driver, time_str: str) -> None:
+    """Open the time picker and click the hour + minute columns.
+
+    time_str is HH:MM (e.g. '07:00', '11:00', '19:00'). The picker is a
+    two-column scroller — left column is hours 00-23, right column is
+    minutes. We click the hour first, then the minute, then click outside
+    to dismiss the popover.
     """
+    print(f"Setting time to {time_str}...")
+    hh, _, mm = time_str.partition(":")
+    hh = (hh or "0").zfill(2)
+    mm = (mm or "00").zfill(2)
+
+    # Locate the time field — readonly input or element whose text is HH:MM.
+    time_field = None
+    for inp in driver.find_elements(By.CSS_SELECTOR, "input"):
+        val = (inp.get_attribute("value") or "").strip()
+        if (
+            len(val) == 5
+            and val[2] == ":"
+            and val[:2].isdigit()
+            and val[3:].isdigit()
+        ):
+            time_field = inp
+            break
+    if time_field is None:
+        for el in driver.find_elements(By.XPATH, "//*[contains(text(), ':')]"):
+            t = (el.text or "").strip()
+            if (
+                len(t) == 5
+                and t[2] == ":"
+                and t[:2].isdigit()
+                and t[3:].isdigit()
+            ):
+                try:
+                    if el.is_displayed():
+                        time_field = el
+                        break
+                except Exception:
+                    continue
+    if time_field is None:
+        raise NoSuchElementException("Could not find time input showing HH:MM")
+
+    driver.execute_script("arguments[0].click()", time_field)
+    time.sleep(2)
+
+    if not _click_value_in_picker(driver, hh):
+        print(f"   ⚠️  Could not click hour {hh}")
+    time.sleep(1)
+    if not _click_value_in_picker(driver, mm):
+        print(f"   ⚠️  Could not click minute {mm}")
+    time.sleep(1)
+
+    # Click outside (body) to close the time popover.
+    try:
+        driver.find_element(By.TAG_NAME, "body").click()
+    except Exception:
+        pass
+    time.sleep(1)
+
+
+def set_schedule_date(driver, date_str: str) -> None:
+    """Open the date picker, navigate to the target month, click the day.
+
+    date_str is YYYY-MM-DD. We compute the target month label from it,
+    step the calendar forward until the displayed header matches, then
+    click the day cell. Finally click outside to close.
+    """
+    print(f"Setting date to {date_str}...")
+    target = datetime.strptime(date_str, "%Y-%m-%d")
+    target_month_label = target.strftime("%B %Y")  # "May 2026"
+    target_day = str(target.day)
+
+    # Locate the date field — readonly input or element with text YYYY-MM-DD.
+    date_field = None
+    for inp in driver.find_elements(By.CSS_SELECTOR, "input"):
+        val = (inp.get_attribute("value") or "").strip()
+        if (
+            len(val) == 10
+            and val[4] == "-"
+            and val[7] == "-"
+            and val[:4].isdigit()
+        ):
+            date_field = inp
+            break
+    if date_field is None:
+        for el in driver.find_elements(By.XPATH, "//*[contains(text(), '-')]"):
+            t = (el.text or "").strip()
+            if (
+                len(t) == 10
+                and t[4] == "-"
+                and t[7] == "-"
+                and t[:4].isdigit()
+            ):
+                try:
+                    if el.is_displayed():
+                        date_field = el
+                        break
+                except Exception:
+                    continue
+    if date_field is None:
+        raise NoSuchElementException(
+            "Could not find date input showing YYYY-MM-DD"
+        )
+
+    driver.execute_script("arguments[0].click()", date_field)
+    time.sleep(2)
+
+    def visible_header_text() -> str:
+        for el in driver.find_elements(By.XPATH, "//*[contains(text(), '20')]"):
+            try:
+                if not el.is_displayed():
+                    continue
+                t = (el.text or "").strip()
+                if any(m in t for m in MONTH_NAMES):
+                    return t
+            except Exception:
+                continue
+        return ""
+
+    # Step the calendar forward until the header matches. Bounded safety loop.
+    for _ in range(24):
+        header = visible_header_text()
+        if target_month_label in header:
+            break
+        next_btn = None
+        for xp in [
+            "//button[contains(@aria-label,'Next') or contains(@aria-label,'next')]",
+            "//*[contains(@class,'arrow-right')]",
+            "//*[contains(@class,'next-month')]",
+            "//*[contains(@class,'arrow') and contains(@class,'right')]",
+        ]:
+            els = driver.find_elements(By.XPATH, xp)
+            if els:
+                next_btn = els[0]
+                break
+        if next_btn is None:
+            print("   ⚠️  Could not find calendar next-month arrow")
+            break
+        driver.execute_script("arguments[0].click()", next_btn)
+        time.sleep(0.6)
+
+    # Click the target day cell. Try cell-like containers first to avoid
+    # accidentally matching numbers elsewhere on the page.
+    clicked = False
+    day_xpath_candidates = [
+        f"//td[normalize-space(text())='{target_day}']",
+        f"//div[contains(@class,'day') and normalize-space(text())='{target_day}']",
+        f"//div[contains(@class,'date') and normalize-space(text())='{target_day}']",
+        f"//button[normalize-space(text())='{target_day}']",
+        f"//*[normalize-space(text())='{target_day}']",
+    ]
+    for xp in day_xpath_candidates:
+        for el in driver.find_elements(By.XPATH, xp):
+            try:
+                if not el.is_displayed():
+                    continue
+                driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'})", el
+                )
+                time.sleep(0.2)
+                driver.execute_script("arguments[0].click()", el)
+                clicked = True
+                break
+            except Exception:
+                continue
+        if clicked:
+            break
+    if not clicked:
+        print(f"   ⚠️  Could not click day {target_day}")
+
+    time.sleep(1)
+    try:
+        driver.find_element(By.TAG_NAME, "body").click()
+    except Exception:
+        pass
+    time.sleep(1)
+
+
+def choose_schedule(driver, date_str: str = "", time_str: str = "") -> None:
+    """Click the Schedule radio, then drive the time and date pickers."""
     # Bring the "When to post" section into view before interacting.
     driver.execute_script("window.scrollBy(0, 400)")
     human_pause(1, 2)
@@ -216,28 +419,40 @@ def choose_schedule(driver, date_str: str = "", time_str: str = "") -> None:
     driver.execute_script("arguments[0].click()", radios[1])
     time.sleep(3)
 
-    # Close any calendar/time picker the radio click may have opened.
-    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-    time.sleep(1)
+    if time_str:
+        try:
+            set_schedule_time(driver, time_str)
+        except Exception as e:
+            print(f"   ⚠️  set_schedule_time failed: {e.__class__.__name__}: {e}")
+
+    if date_str:
+        try:
+            set_schedule_date(driver, date_str)
+        except Exception as e:
+            print(f"   ⚠️  set_schedule_date failed: {e.__class__.__name__}: {e}")
+
+    time.sleep(2)
 
 
 def click_post_button(driver) -> None:
-    """Click the submit button — "Schedule" when scheduling, else "Post"."""
-    print("   Looking for Post button...")
+    """Click the Schedule/Post button, then handle the 'Continue to post?' popup."""
+    print("Clicking Schedule button...")
     for btn in driver.find_elements(By.TAG_NAME, "button"):
         label = (btn.text or "").strip()
         if label in ("Schedule", "Post"):
             driver.execute_script("arguments[0].click()", btn)
-            # TikTok sometimes interstitial-prompts "Continue to post?" with
-            # a "Post now" confirmation button; click it if it shows up.
+            # TikTok sometimes shows a "Continue to post?" interstitial with
+            # a "Post now" confirmation button. Give it 5s to appear, then
+            # take a short look for the button.
+            time.sleep(5)
             try:
-                confirm_btn = WebDriverWait(driver, 5).until(
+                confirm_btn = WebDriverWait(driver, 3).until(
                     EC.element_to_be_clickable(
                         (By.XPATH, "//button[normalize-space()='Post now']")
                     )
                 )
                 driver.execute_script("arguments[0].click()", confirm_btn)
-                print("Dismissed content check popup - clicked Post now")
+                print("   Dismissed 'Continue to post?' popup — clicked Post now")
             except (TimeoutException, NoSuchElementException):
                 pass
             return
