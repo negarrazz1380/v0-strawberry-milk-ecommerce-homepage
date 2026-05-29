@@ -408,8 +408,8 @@
     <p class="ctx" id="detailCtx"></p>
     <div id="detailBody"></div>
     <div class="vp-label">
-      <span>File Name</span>
-      <button type="button" class="copy-btn" id="detailCopyFn">Copy Filename</button>
+      <span>Slot ID</span>
+      <button type="button" class="copy-btn" id="detailCopyFn">Copy Slot ID</button>
     </div>
     <div class="filename-display" id="detailFn"></div>
     <div class="vp-label">
@@ -469,9 +469,10 @@
     return "";
   }
 
-  // Auto-generated filename = CK_[case]_c[archetype#]_w[week] (no extension). Computed
-  // at render time from the card's current product / archetype / date so it
-  // stays in sync if any of those fields are edited later.
+  // Auto-generated slot ID = CK_[case]_c[archetype#]_w[week]_[day]_[timeslot]. This is the
+  // NAME the user gives to their exported video file from Higgsfield — it identifies the
+  // slot, not the video. The actual video file picker stores its filepath separately as
+  // entry.videoFilePath and is decoupled from this identifier.
   var CASE_SLUGS = {
     "Dachshund": "dachshund",
     "Hello Kitty Cherry": "hellokitty",
@@ -484,6 +485,7 @@
     "Butter Bear": "butterbear",
     "Bow Diamond": "bowdiamond"
   };
+  var DAY_ABBREVS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   function caseSlug(product) {
     return CASE_SLUGS[product] || String(product || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   }
@@ -501,10 +503,18 @@
     if (diff < 0) return 0;
     return Math.floor(diff / 7) + 1;
   }
-  function generateFilename(entry, key) {
-    var dateStr = key ? key.split("__")[0] : "";
+  function dayAbbrev(dateStr) {
+    if (!dateStr) return "";
+    var parts = dateStr.split("-");
+    var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    return DAY_ABBREVS[d.getDay()] || "";
+  }
+  function generateSlotId(entry, key) {
+    var parts = (key || "").split("__");
+    var dateStr = parts[0] || "";
+    var slot = parts[1] || "";
     return "CK_" + caseSlug(entry.product) + "_c" + conceptNumber(entry.archetype) +
-           "_w" + weekNumber(dateStr);
+           "_w" + weekNumber(dateStr) + "_" + dayAbbrev(dateStr) + "_" + slot;
   }
   function flashCopied(box) {
     if (!box) return;
@@ -592,9 +602,10 @@
   // 28-day content plan, May 29 – Jun 25 2026. 28 archetypes spread
   // across the month — no format repeats more than twice per week.
   // SEED keeps videoPrompt blank; seedPlan() renders the default prompt from
-  // PROMPT_TEMPLATES at seed time (with [CASE] → product). v11 migrates any
-  // entries from the prior May 27–Jun 23 range forward by 2 days, then syncs
-  // archetype + preset onto every slot. Filenames are computed at render.
+  // PROMPT_TEMPLATES at seed time (with [CASE] → product). v12 migrates the
+  // legacy `videoFile` field to `videoFilePath` (the slot ID is now the
+  // user-facing filename and is computed from the slot's date/time/product/
+  // archetype at render time).
   var SEED = [
     { date: "2026-05-29", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "ASMR Unboxing", caption: "the pink box opening is sending me 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
     { date: "2026-05-29", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "before vs after my phone met its match 📱➡️🎀 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
@@ -688,20 +699,17 @@
   var detailKey = null;
 
   // ---------- seed ----------
-  // Versioned gate: runs once per version. v11 first migrates any entries from
-  // the prior SEED range (2026-05-27 – 2026-06-23) forward by 2 days to match
-  // the shifted schedule. Then for existing slots, syncs archetype + preset
-  // and back-fills an empty videoPrompt with the default template prompt —
+  // Versioned gate: runs once per version. v12 renames `videoFile` to
+  // `videoFilePath` on every existing entry — the slot ID is now the identifier
+  // the user types as their Higgsfield export filename, while videoFilePath
+  // points at whatever local file they attach (multiple slots may reuse the
+  // same file). For existing slots, also syncs archetype + preset and
+  // back-fills an empty videoPrompt with the default template prompt —
   // user-written prompts are never overwritten. Empty slots get a full SEED
   // insert with preset + rendered videoPrompt.
-  function shiftDateStr(s, days) {
-    var p = s.split("-");
-    var d = addDays(new Date(+p[0], +p[1] - 1, +p[2]), days);
-    return dateKey(d);
-  }
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v11"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v12"); } catch (e) { return; }
     if (seeded != null) return;
 
     var existing = {};
@@ -711,34 +719,28 @@
       if (parsed && typeof parsed === "object") existing = parsed;
     } catch (e) { /* ignore */ }
 
-    // v11 migration: any entry whose date is in the prior SEED window shifts
-    // forward by 2 days. Entries outside that window are left in place. If a
-    // shift would land on a key that's already taken, the first one wins
-    // (the colliding entry is dropped — this only happens if the user added
-    // a card 2 days into the future of an existing seed slot).
-    var OLD_START = "2026-05-27";
-    var OLD_END = "2026-06-23";
-    var migrated = {};
-    Object.keys(existing).forEach(function (oldKey) {
-      var parts = oldKey.split("__");
-      var oldDate = parts[0];
-      var slotId = parts[1];
-      var newDate = (oldDate >= OLD_START && oldDate <= OLD_END) ? shiftDateStr(oldDate, 2) : oldDate;
-      var newKey = newDate + "__" + slotId;
-      if (!migrated[newKey]) migrated[newKey] = existing[oldKey];
+    // v12 migration: rename legacy videoFile → videoFilePath. The old field
+    // stored only the basename, so existing values are carried over verbatim.
+    Object.keys(existing).forEach(function (k) {
+      var cur = existing[k];
+      if (!cur || typeof cur !== "object") return;
+      if (cur.videoFilePath == null && cur.videoFile) {
+        cur.videoFilePath = cur.videoFile;
+      }
+      delete cur.videoFile;
     });
 
     SEED.forEach(function (s) {
       var key = s.date + "__" + s.slot;
       var preset = presetFor(s.archetype);
       var prompt = defaultPromptFor(s.archetype, s.product);
-      var cur = migrated[key];
+      var cur = existing[key];
       if (cur) {
         cur.archetype = s.archetype;
         cur.preset = preset;
         if (!cur.videoPrompt) cur.videoPrompt = prompt;
       } else {
-        migrated[key] = {
+        existing[key] = {
           id: "c_" + Math.random().toString(36).slice(2, 10),
           platform: s.platform,
           product: s.product,
@@ -752,8 +754,8 @@
         };
       }
     });
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v11", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v12", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -892,7 +894,9 @@
     else if (status === "confirmed") stClass = " is-confirmed";
     else if (status === "scheduled") stClass = " is-scheduled";
     card.className = "card pf-" + entry.platform + stClass;
-    var filename = generateFilename(entry, key);
+    var slotId = generateSlotId(entry, key);
+    var videoPath = entry.videoFilePath || "";
+    var videoLabel = videoPath ? videoPath.split(/[\\/]/).pop() : "";
     var conceptNum = conceptNumber(entry.archetype);
     var preset = entry.preset || presetFor(entry.archetype);
     card.innerHTML =
@@ -902,12 +906,12 @@
         '<span class="c-status st-' + esc(status) + '">' + esc(statusLabel(status)) + "</span>" +
         (conceptNum ? '<span class="c-concept">C' + conceptNum + "</span>" : "") +
         (preset ? '<span class="c-preset">' + esc(preset) + "</span>" : "") +
-        (entry.videoFile ? '<span class="c-video" title="' + esc(entry.videoFile) + '">🎬 ' + esc(entry.videoFile) + '</span>' : "") +
+        (videoLabel ? '<span class="c-video" title="' + esc(videoPath) + '">🎬 ' + esc(videoLabel) + '</span>' : "") +
         (entry.videoPrompt ? '<span class="c-vp">📝 prompt</span>' : "") +
       "</div>" +
       '<div class="c-filename">' +
-        '<span class="fn-text" title="' + esc(filename) + '">' + esc(filename) + "</span>" +
-        '<button type="button" class="fn-copy" title="Copy filename" aria-label="Copy filename">📋</button>' +
+        '<span class="fn-text" title="' + esc(slotId) + '">' + esc(slotId) + "</span>" +
+        '<button type="button" class="fn-copy" title="Copy slot ID" aria-label="Copy slot ID">📋</button>' +
       "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
@@ -931,7 +935,7 @@
       fnCopyBtn.addEventListener("click", function (ev) {
         ev.stopPropagation();
         if (!navigator.clipboard) return;
-        navigator.clipboard.writeText(filename).then(function () { flashCopied(fnBox); });
+        navigator.clipboard.writeText(slotId).then(function () { flashCopied(fnBox); });
       });
     }
     return card;
@@ -979,9 +983,10 @@
     alert("No empty slots left this week — try next week 🎀");
   }
 
-  // pending video filename for the form being edited — file inputs can't
-  // be programmatically re-populated, so we track the chosen filename here.
-  var pendingVideoFile = "";
+  // pending video file path for the form being edited — file inputs can't be
+  // programmatically re-populated, so we track the chosen file's path here.
+  // Multiple slots can point to the same file; that's expected.
+  var pendingVideoFilePath = "";
 
   function setSoundSourceUI(val) {
     var labels = document.querySelectorAll("#f-soundSource label");
@@ -996,9 +1001,10 @@
     var checked = document.querySelector('#f-soundSource input[name="soundSource"]:checked');
     return checked ? checked.value : "tiktok";
   }
-  function setVideoFileUI(name) {
-    pendingVideoFile = name || "";
-    document.getElementById("f-videoFileName").textContent = pendingVideoFile || "No file selected";
+  function setVideoFileUI(path) {
+    pendingVideoFilePath = path || "";
+    var display = pendingVideoFilePath ? pendingVideoFilePath.split(/[\\/]/).pop() : "";
+    document.getElementById("f-videoFileName").textContent = display || "No file selected";
   }
 
   function openForm(key, presetArchetype) {
@@ -1017,7 +1023,7 @@
     document.getElementById("f-videoprompt").value = e ? (e.videoPrompt || "") : "";
     document.getElementById("f-status").value = e ? (e.status || "planned") : STATUSES[0].v;
     setSoundSourceUI(e && e.soundSource ? e.soundSource : "tiktok");
-    setVideoFileUI(e && e.videoFile ? e.videoFile : "");
+    setVideoFileUI(e && e.videoFilePath ? e.videoFilePath : "");
     // Reset native file input value so picking the same file twice still fires change.
     document.getElementById("f-videoFile").value = "";
     closeOverlay("detailOverlay");
@@ -1029,14 +1035,15 @@
     lab.addEventListener("click", function () { setSoundSourceUI(lab.getAttribute("data-val")); });
   });
 
-  // Video file: open the hidden file input when the button is clicked,
-  // store only the basename — full paths aren't exposed by the browser anyway.
+  // Video file: open the hidden file input when the button is clicked. Prefer the
+  // full path when available (Electron exposes f.path; browsers redact it for
+  // security and we fall back to the basename).
   document.getElementById("f-videoFileBtn").addEventListener("click", function () {
     document.getElementById("f-videoFile").click();
   });
   document.getElementById("f-videoFile").addEventListener("change", function (ev) {
     var f = ev.target.files && ev.target.files[0];
-    if (f) setVideoFileUI(f.name);
+    if (f) setVideoFileUI(f.path || f.name);
   });
 
   document.getElementById("contentForm").addEventListener("submit", function (ev) {
@@ -1056,7 +1063,7 @@
       caption: document.getElementById("f-caption").value.trim(),
       sound: document.getElementById("f-sound").value.trim(),
       soundSource: getSoundSourceUI(),
-      videoFile: pendingVideoFile,
+      videoFilePath: pendingVideoFilePath,
       videoPrompt: document.getElementById("f-videoprompt").value.trim(),
       status: document.getElementById("f-status").value,
       createdAt: existing && existing.createdAt ? existing.createdAt : Date.now()
@@ -1087,9 +1094,9 @@
       row("Caption", e.caption || "—") +
       row("Sound / tags", e.sound || "—") +
       row("Sound source", soundSourceLabel(e.soundSource || "tiktok")) +
-      row("Video file", e.videoFile || "—") +
+      row("Video file", e.videoFilePath || "—") +
       row("Status", statusLabel(e.status));
-    document.getElementById("detailFn").textContent = generateFilename(e, key);
+    document.getElementById("detailFn").textContent = generateSlotId(e, key);
     document.getElementById("detailVP").textContent = e.videoPrompt || "No video prompt yet.";
     document.getElementById("detailPosted").textContent =
       e.status === "posted" ? "Mark as planned" : "Mark as posted";
@@ -1121,7 +1128,7 @@
     navigator.clipboard.writeText(text).then(function () {
       btn.classList.add("copied");
       btn.textContent = "✓ Copied!";
-      setTimeout(function () { btn.classList.remove("copied"); btn.textContent = "Copy Filename"; }, 1000);
+      setTimeout(function () { btn.classList.remove("copied"); btn.textContent = "Copy Slot ID"; }, 1000);
     });
   });
 
@@ -1178,6 +1185,7 @@
       var timeKey = parts[1];
       queue.push({
         id: e.id,
+        slotId: generateSlotId(e, key),
         dateKey: dateKey,
         timeKey: timeKey,
         platform: e.platform,
@@ -1186,7 +1194,7 @@
         caption: e.caption || "",
         sound: e.sound || "",
         soundSource: e.soundSource || "tiktok",
-        videoFile: e.videoFile || "",
+        videoFile: e.videoFilePath || "",
         scheduleDate: dateKey,
         scheduleTime: slotTime24(timeKey),
         status: e.status
