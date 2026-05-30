@@ -179,6 +179,16 @@
     color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
   }
   .match-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59,130,246,.3); }
+  .round-btn {
+    background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);
+    color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
+  }
+  .round-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(244,63,94,.3); }
+  .sync-btn {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
+  }
+  .sync-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99,102,241,.3); }
   .toast {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
     background: #111827; color: #fff; padding: 12px 20px; border-radius: 999px;
@@ -351,7 +361,11 @@
     <button class="today-btn" id="todayBtn">Today</button>
     <button class="export-btn" id="exportBtn">📤 Export for Posting</button>
     <button class="match-btn" id="autoMatchBtn">🎬 Auto-Match Videos</button>
+    <button class="round-btn" id="startPostingBtn">🚀 Start Posting Round</button>
+    <button class="sync-btn" id="syncPostedBtn">📥 Sync Posted Status</button>
     <input type="file" id="autoMatchInput" accept="video/mp4,.mp4" multiple style="display:none">
+    <input type="file" id="startPostingInput" accept="video/mp4,.mp4" multiple style="display:none">
+    <input type="file" id="syncPostedInput" accept=".json,application/json" style="display:none">
     <button class="nav-btn" id="nextWeek">Next →</button>
     <div class="range" id="rangeLabel">—</div>
   </div>
@@ -463,6 +477,19 @@
     </div>
     <div class="modal-actions">
       <button type="button" class="btn-ghost" id="detailClose" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Posting-round summary modal -->
+<div class="overlay" id="roundOverlay">
+  <div class="modal">
+    <h2 id="roundTitle">Posting round summary</h2>
+    <p class="ctx" id="roundCtx"></p>
+    <div id="roundBody" style="max-height: 50vh; overflow-y: auto; font-size: 13px;"></div>
+    <div class="modal-actions" style="margin-top: 18px;">
+      <button type="button" class="btn-primary" id="roundContinue" style="flex:1;">Continue</button>
+      <button type="button" class="btn-ghost" id="roundClose">Close</button>
     </div>
   </div>
 </div>
@@ -770,7 +797,7 @@
   // insert with preset + rendered videoPrompt.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v12"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v13"); } catch (e) { return; }
     if (seeded != null) return;
 
     var existing = {};
@@ -816,7 +843,7 @@
       }
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v12", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v13", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -1000,24 +1027,26 @@
   }
 
   function renderStats() {
-    var total = 0, posted = 0, tt = 0, ig = 0, bo = 0;
-    for (var i = 0; i < 7; i++) {
-      var d = addDays(weekStart, i);
-      SLOTS.forEach(function (slot) {
-        var e = data[slotKey(d, slot.id)];
-        if (!e) return;
-        total++;
-        if (e.status === "posted") posted++;
-        if (e.platform === "TikTok") tt++;
-        else if (e.platform === "Instagram") ig++;
-        else if (e.platform === "Both") bo++;
-      });
-    }
+    // Totals are calendar-wide (across all weeks) because posting rounds
+    // also operate across all weeks, not just the visible one.
+    var planned = 0, confirmed = 0, posted = 0;
+    var tt = 0, ig = 0, bo = 0;
+    Object.keys(data).forEach(function (key) {
+      var e = data[key];
+      if (!e) return;
+      if (e.status === "posted")         posted++;
+      else if (e.status === "confirmed") confirmed++;
+      else                                planned++;
+      if (e.platform === "TikTok")        tt++;
+      else if (e.platform === "Instagram") ig++;
+      else if (e.platform === "Both")      bo++;
+    });
+    var remaining = planned + confirmed;
     document.getElementById("stats").innerHTML =
-      stat(total, "This week") +
-      '<div class="stat divider"></div>' +
+      stat(planned, "Planned") +
+      stat(confirmed, "Confirmed") +
       stat(posted, "Posted") +
-      stat(total - posted, "Remaining") +
+      stat(remaining, "Remaining") +
       '<div class="stat divider"></div>' +
       '<div class="pf-legend">' +
         '<span><span class="dot tt"></span>TikTok ' + tt + "</span>" +
@@ -1467,10 +1496,183 @@
     showToast("Auto-matched " + slotsConfirmed + " slot" + (slotsConfirmed === 1 ? "" : "s") + " 🎬");
   }
 
+  // ---------- posting round ----------
+  // Strict status machine: planned → confirmed → posted.
+  // A posting round only ever touches `planned` cards, and only flips them
+  // to `confirmed` when a matching video file shows up. `posted` cards are
+  // walled off and never re-enter the round.
+  function startPostingRound(files) {
+    if (!files || !files.length) return;
+
+    // Build (case+archetype) → file lookup from the user's picks. Last file
+    // wins on duplicate combos.
+    var fileByCombo = {};
+    var unmatchedFiles = [];
+    for (var f = 0; f < files.length; f++) {
+      var name = files[f].name;
+      var product = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
+      var archetype = applyFilenameRules(name, FILENAME_CONCEPT_RULES, "archetype");
+      if (product && archetype) {
+        fileByCombo[product + "||" + archetype] = name;
+      } else {
+        unmatchedFiles.push({
+          name: name,
+          reason: !product && !archetype ? "no case or concept" :
+                  !product ? "no case" : "no concept"
+        });
+      }
+    }
+
+    var confirmed = [];    // newly flipped planned → confirmed this round
+    var stillPlanned = []; // planned + no matching file
+    var skippedPosted = 0; // cards already past the line
+
+    Object.keys(data).forEach(function (key) {
+      var e = data[key];
+      if (!e) return;
+      if (e.status === "posted") { skippedPosted++; return; }
+      if (e.status !== "planned") return; // confirmed cards left alone here
+      var combo = e.product + "||" + e.archetype;
+      var file = fileByCombo[combo];
+      if (file) {
+        e.status = "confirmed";
+        e.videoFilePath = file;
+        confirmed.push({ key: key, entry: e });
+      } else {
+        stillPlanned.push({ key: key, entry: e });
+      }
+    });
+
+    saveData();
+    renderCalendar();
+
+    // Build summary modal body.
+    var html = '<p style="margin: 0 0 10px 0;">' +
+      '<strong>✅ ' + confirmed.length + '</strong> card' + (confirmed.length === 1 ? "" : "s") + ' confirmed (videos matched)<br>' +
+      '<strong>⚠️ ' + stillPlanned.length + '</strong> card' + (stillPlanned.length === 1 ? "" : "s") + ' still need videos<br>' +
+      '<strong>⏭️ ' + skippedPosted + '</strong> card' + (skippedPosted === 1 ? "" : "s") + ' already posted (skipped)' +
+      "</p>";
+
+    if (stillPlanned.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">Still need videos:</h3>';
+      html += '<ul style="margin: 0; padding-left: 18px;">';
+      stillPlanned.forEach(function (s) {
+        html += "<li>" + esc(humanContext(s.key)) + " — " +
+          esc(s.entry.product) + " + " + esc(s.entry.archetype) + "</li>";
+      });
+      html += "</ul>";
+    }
+
+    if (unmatchedFiles.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b91c1c;">Files I couldn\'t parse:</h3>';
+      html += '<ul style="margin: 0; padding-left: 18px;">';
+      unmatchedFiles.forEach(function (u) {
+        html += "<li>" + esc(u.name) + " (" + esc(u.reason) + ")</li>";
+      });
+      html += "</ul>";
+    }
+
+    if (confirmed.length) {
+      html += '<p style="margin: 14px 0 0 0; font-size: 12px; color: var(--muted);">' +
+        "Click Continue to download <code>posting-queue.json</code> for tiktok_poster.py." +
+        "</p>";
+    }
+
+    document.getElementById("roundTitle").textContent = "Posting round summary";
+    document.getElementById("roundCtx").textContent =
+      "Reviewed " + files.length + " uploaded video" + (files.length === 1 ? "" : "s");
+    document.getElementById("roundBody").innerHTML = html;
+    // Continue exports + closes; Close just dismisses without exporting.
+    var continueBtn = document.getElementById("roundContinue");
+    continueBtn.style.display = confirmed.length ? "" : "none";
+    continueBtn.textContent = "Continue & Export Queue";
+    pendingRoundExport = confirmed.length > 0;
+    openOverlay("roundOverlay");
+  }
+
+  var pendingRoundExport = false;
+
+  // ---------- sync posted status ----------
+  // Reads a round-complete.json the Python poster wrote, finds matching
+  // entries by id, flips them to posted. localStorage tracks the last
+  // synced round's completedAt so re-picking the same file is a no-op.
+  function syncPostedStatus(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var payload;
+      try { payload = JSON.parse(ev.target.result); }
+      catch (e) {
+        alert("❌ Couldn't parse round-complete.json: " + e.message);
+        return;
+      }
+      var completedAt = payload.completedAt || "";
+      var slots = Array.isArray(payload.postedSlots) ? payload.postedSlots : [];
+      if (!slots.length) {
+        alert("round-complete.json had no posted slots — nothing to sync.");
+        return;
+      }
+
+      // Dedup: if we've already synced this round, skip silently rather than
+      // re-flipping (which is idempotent but confusing for the user).
+      var lastSynced = "";
+      try { lastSynced = localStorage.getItem("ck_last_round_synced") || ""; } catch (e) { /* ignore */ }
+      if (completedAt && completedAt === lastSynced) {
+        alert("This round was already synced — nothing to do.");
+        return;
+      }
+
+      // Build id → key index once so we don't re-walk for every slot.
+      var keyById = {};
+      Object.keys(data).forEach(function (k) {
+        var e = data[k];
+        if (e && e.id) keyById[e.id] = k;
+      });
+
+      var marked = 0;
+      var missing = [];
+      slots.forEach(function (s) {
+        var key = s.id ? keyById[s.id] : null;
+        // Fall back to (dateKey, timeKey) lookup if id didn't match (e.g.,
+        // the card was rebuilt by seedPlan between rounds).
+        if (!key && s.dateKey && s.timeKey) {
+          var probe = s.dateKey + "__" + s.timeKey;
+          if (data[probe]) key = probe;
+        }
+        if (key && data[key]) {
+          data[key].status = "posted";
+          marked++;
+        } else {
+          missing.push(s);
+        }
+      });
+
+      saveData();
+      renderCalendar();
+      try { localStorage.setItem("ck_last_round_synced", completedAt); } catch (e) { /* ignore */ }
+
+      var msg = "✅ " + marked + " card" + (marked === 1 ? "" : "s") + " marked as posted from last round.";
+      if (missing.length) {
+        msg += "\n⚠️ " + missing.length + " slot" + (missing.length === 1 ? "" : "s") +
+          " in round-complete.json had no matching calendar card.";
+      }
+      msg += "\n\nYou can now delete ~/Desktop/CaseKisses/round-complete.json " +
+        "(the browser can't delete it directly).";
+      alert(msg);
+      showToast("Synced " + marked + " posted card" + (marked === 1 ? "" : "s") + " 📥");
+    };
+    reader.onerror = function () { alert("❌ Failed to read the file."); };
+    reader.readAsText(file);
+  }
+
   // ---------- overlays ----------
   function openOverlay(id) { document.getElementById(id).classList.add("open"); }
   function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
-  function closeAllOverlays() { closeOverlay("formOverlay"); closeOverlay("detailOverlay"); }
+  function closeAllOverlays() {
+    closeOverlay("formOverlay");
+    closeOverlay("detailOverlay");
+    closeOverlay("roundOverlay");
+  }
 
   document.getElementById("formCancel").addEventListener("click", function () { closeOverlay("formOverlay"); });
   document.getElementById("detailClose").addEventListener("click", function () { closeOverlay("detailOverlay"); });
@@ -1487,6 +1689,35 @@
     ev.target.value = "";
   });
 
+  document.getElementById("startPostingBtn").addEventListener("click", function () {
+    document.getElementById("startPostingInput").click();
+  });
+  document.getElementById("startPostingInput").addEventListener("change", function (ev) {
+    startPostingRound(ev.target.files);
+    ev.target.value = "";
+  });
+
+  document.getElementById("syncPostedBtn").addEventListener("click", function () {
+    document.getElementById("syncPostedInput").click();
+  });
+  document.getElementById("syncPostedInput").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (f) syncPostedStatus(f);
+    ev.target.value = "";
+  });
+
+  document.getElementById("roundContinue").addEventListener("click", function () {
+    closeOverlay("roundOverlay");
+    if (pendingRoundExport) {
+      pendingRoundExport = false;
+      exportForPosting();
+    }
+  });
+  document.getElementById("roundClose").addEventListener("click", function () {
+    closeOverlay("roundOverlay");
+    pendingRoundExport = false;
+  });
+
   document.getElementById("shootListCopyAll").addEventListener("click", function () {
     var btn = this;
     var text = shootListText();
@@ -1500,7 +1731,7 @@
     });
   });
 
-  ["formOverlay", "detailOverlay"].forEach(function (id) {
+  ["formOverlay", "detailOverlay", "roundOverlay"].forEach(function (id) {
     document.getElementById(id).addEventListener("click", function (ev) {
       if (ev.target === this) closeOverlay(id);
     });

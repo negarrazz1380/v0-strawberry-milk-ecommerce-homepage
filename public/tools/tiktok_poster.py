@@ -58,6 +58,7 @@ HOME = Path.home()
 BASE_DIR = HOME / "Desktop" / "CaseKisses"
 QUEUE_PATH = BASE_DIR / "posting-queue.json"
 VIDEO_DIR = BASE_DIR / "videos"
+ROUND_COMPLETE_PATH = BASE_DIR / "round-complete.json"
 
 
 # ---------- helpers ----------
@@ -203,6 +204,36 @@ def match_video_for_post(
 def save_queue(queue: list) -> None:
     with open(QUEUE_PATH, "w", encoding="utf-8") as f:
         json.dump(queue, f, indent=2, ensure_ascii=False)
+
+
+def write_round_complete(scheduled: list) -> None:
+    """Dump a summary of this round's successful posts.
+
+    The calendar's 'Sync Posted Status' button consumes this file to flip
+    matching cards to 'posted'. Each entry carries the original calendar
+    `id` so the sync can match unambiguously even if the date moved.
+    """
+    payload = {
+        "completedAt": datetime.now().isoformat(timespec="seconds"),
+        "postedCount": len(scheduled),
+        "postedSlots": [
+            {
+                "id": it.get("id"),
+                "slotId": it.get("slotId"),
+                "dateKey": it.get("dateKey"),
+                "timeKey": it.get("timeKey"),
+                "platform": it.get("platform"),
+                "product": it.get("product"),
+                "archetype": it.get("archetype"),
+                "scheduleDate": it.get("scheduleDate"),
+                "scheduleTime": it.get("scheduleTime"),
+            }
+            for it in scheduled
+        ],
+    }
+    with open(ROUND_COMPLETE_PATH, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    print(f"📝 Wrote round summary → {ROUND_COMPLETE_PATH}")
 
 
 def combined_caption(item: dict) -> str:
@@ -641,11 +672,21 @@ def main():
         print("   Run setup_casekisses.sh first.")
         sys.exit(1)
 
-    # Only consider items the user has confirmed in the calendar.
+    # Only consider items the user has confirmed in the calendar. `planned`
+    # cards are missing videos; `posted` cards are already done — both stay
+    # out of this round entirely.
     confirmed_items = [it for it in queue if it.get("status") == "confirmed"]
     if not confirmed_items:
         print("No items in the queue are marked 'confirmed' — nothing to do.")
         return
+
+    # Clear any stale round-complete.json from a previous run so the calendar
+    # can't accidentally re-sync an old round.
+    if ROUND_COMPLETE_PATH.exists():
+        try:
+            ROUND_COMPLETE_PATH.unlink()
+        except OSError as e:
+            print(f"⚠️  Couldn't delete old {ROUND_COMPLETE_PATH.name}: {e}")
 
     available_videos = list_video_files()
     if not available_videos:
@@ -755,6 +796,13 @@ def main():
         print(f"\n❌ Failed: {len(failed)}")
         for it in failed:
             print(f"   - {it.get('scheduleDate')} {it.get('scheduleTime')}: {it.get('archetype')}")
+
+    if scheduled:
+        write_round_complete(scheduled)
+        print(
+            "\nNext: open the calendar and click '📥 Sync Posted Status', "
+            "then select round-complete.json to mark these cards posted."
+        )
 
     print("\nAll done! Check TikTok Studio to confirm your scheduled posts.")
 
