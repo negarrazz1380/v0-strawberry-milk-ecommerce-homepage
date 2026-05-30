@@ -88,6 +88,123 @@ def find_video(filename: str) -> Path | None:
     return None
 
 
+# Fuzzy aliases for product (case) names and archetypes (concepts).
+# Keys are the human label stored in the posting queue; values are the
+# substrings we look for inside a video filename (after normalization).
+CASE_ALIASES = {
+    "Dachshund": ["dachshund", "dachy", "dach"],
+    "Hello Kitty Cherry": ["hellokitty", "hello_kitty", "hkc"],
+    "Mario": ["mario"],
+    "Bow Cherry": ["bowcherry", "bow_cherry", "bcherry"],
+    "Cherry": ["cherry"],  # excluded if filename also matches bowcherry/hellokitty
+    "Wavy": ["wavy"],
+    "Puppy": ["puppy"],
+    "Burger": ["burger"],
+    "Butter Bear": ["butterbear", "butter_bear", "bbear"],
+    "Bow Diamond": ["bowdiamond", "bow_diamond", "bdiamand"],
+}
+
+CONCEPT_ALIASES = {
+    "ASMR Unboxing": ["asmr", "unbox"],
+    "Before/After Ugly Case": ["beforeafter", "before_after", "ugly"],
+    "POV Outfit Match": ["outfitmatch", "outfit", "pov"],
+    "Girl Math Comedy": ["girlmath", "girl_math"],
+    "Cases I've Been Gatekeeping": ["gatekeep"],
+    "Which One Matches Your Vibe": ["whichone", "which_one", "vibe"],
+    "Rate My Phone Setup": ["desksetup", "desk", "setup", "rate"],
+    "Stitch Bait": ["stitch"],
+    "GRWM Morning Routine": ["grwm", "morning"],
+    "Satisfying Loop Click": ["satisfying", "loop", "click"],
+    "Small Business BTS": ["bts", "behind", "packing"],
+    "Fruit Case Trend": ["fruit", "fruittrend"],
+    "My Boyfriend Hates It": ["boyfriend"],
+    "IT Girl Phone Check": ["itgirl", "it_girl"],
+    "Canadian Small Business": ["canadian"],
+    "Compliment Magnet": ["compliment"],
+    "Nostalgia Hit": ["nostalgia"],
+    "Unboxing Surprise Gift": ["giftunbox", "gift", "surprise"],
+    "Hand Covers Camera Transition": ["handtransition", "hand"],
+    "Outfit Swap Transition": ["outfitswap", "swap"],
+    "Falling Phone Transition": ["fallingphone", "falling", "drop"],
+    "PR Package Haul": ["prhaul", "pr_haul"],
+    "Influencer Ranking Haul": ["ranking"],
+    "Honest Review 2 Weeks": ["honestrev", "honest", "review"],
+    "Not Gatekeeping": ["notgatekeep", "not_gate"],
+    "Should Be Illegal Hook": ["illegal"],
+    "Founder Story": ["founder"],
+    "Didn't Know This Existed": ["didntknow", "didnt_know"],
+}
+
+
+def _norm(s: str) -> str:
+    """Lowercase and strip underscores/spaces — used for fuzzy filename matching."""
+    return s.lower().replace("_", "").replace(" ", "").replace("-", "")
+
+
+def _filename_matches_alias(norm_name: str, alias: str) -> bool:
+    return _norm(alias) in norm_name
+
+
+def _filename_matches_case(norm_name: str, case_label: str) -> bool:
+    aliases = CASE_ALIASES.get(case_label, [])
+    if not aliases:
+        # Fall back to a normalized contains check on the label itself.
+        return _norm(case_label) in norm_name
+    if not any(_filename_matches_alias(norm_name, a) for a in aliases):
+        return False
+    # Special case: bare "Cherry" should not match bowcherry or hellokitty files.
+    if case_label == "Cherry":
+        for excluded in ("bowcherry", "hellokitty"):
+            if excluded in norm_name:
+                return False
+    return True
+
+
+def _filename_matches_concept(norm_name: str, concept_label: str) -> bool:
+    aliases = CONCEPT_ALIASES.get(concept_label, [])
+    if not aliases:
+        return _norm(concept_label) in norm_name
+    return any(_filename_matches_alias(norm_name, a) for a in aliases)
+
+
+def list_video_files() -> list[Path]:
+    if not VIDEO_DIR.exists():
+        return []
+    return sorted(p for p in VIDEO_DIR.glob("*.mp4") if p.is_file())
+
+
+def match_video_for_post(
+    case_label: str, concept_label: str, candidates: list[Path]
+) -> Path | None:
+    """Return the best matching .mp4 for a (case, concept) pair, or None.
+
+    Priority: case + concept > case only > concept only > nothing.
+    """
+    case_hits: list[Path] = []
+    concept_hits: list[Path] = []
+    both_hits: list[Path] = []
+    for path in candidates:
+        norm = _norm(path.name)
+        case_ok = _filename_matches_case(norm, case_label) if case_label else False
+        concept_ok = _filename_matches_concept(norm, concept_label) if concept_label else False
+        if case_ok and concept_ok:
+            both_hits.append(path)
+        elif case_ok:
+            case_hits.append(path)
+        elif concept_ok:
+            concept_hits.append(path)
+
+    for bucket in (both_hits, case_hits, concept_hits):
+        if bucket:
+            return bucket[0]
+    return None
+
+
+def save_queue(queue: list) -> None:
+    with open(QUEUE_PATH, "w", encoding="utf-8") as f:
+        json.dump(queue, f, indent=2, ensure_ascii=False)
+
+
 def combined_caption(item: dict) -> str:
     """Caption + hashtags — `sound` field on the card holds the hashtags."""
     caption = (item.get("caption") or "").strip()
@@ -524,33 +641,81 @@ def main():
         print("   Run setup_casekisses.sh first.")
         sys.exit(1)
 
-    print(f"Loaded {len(queue)} item(s). Connecting to Chrome on port 9222.\n")
+    # Only consider items the user has confirmed in the calendar.
+    confirmed_items = [it for it in queue if it.get("status") == "confirmed"]
+    if not confirmed_items:
+        print("No items in the queue are marked 'confirmed' — nothing to do.")
+        return
+
+    available_videos = list_video_files()
+    if not available_videos:
+        print(f"❌ No .mp4 files found in {VIDEO_DIR}")
+        sys.exit(1)
+
+    # ---------- pre-flight match summary ----------
+    print(f"Scanning {len(available_videos)} videos in {VIDEO_DIR}")
+    print(f"Matching {len(confirmed_items)} confirmed post(s)...\n")
+
+    matched: list[tuple[dict, Path]] = []
+    unmatched: list[dict] = []
+
+    for item in confirmed_items:
+        case_label = item.get("product", "")
+        concept_label = item.get("archetype", "")
+        date = item.get("scheduleDate", "?")
+        time_str = item.get("scheduleTime", "?")
+        platform = item.get("platform", "?")
+
+        video_path = match_video_for_post(case_label, concept_label, available_videos)
+        if video_path:
+            print(
+                f"✅ MATCHED: {date} {time_str} {platform} → "
+                f"{case_label} + {concept_label} → {video_path.name}"
+            )
+            matched.append((item, video_path))
+        else:
+            print(
+                f"❌ NO MATCH: {date} {time_str} {platform} → "
+                f"{case_label} + {concept_label}"
+            )
+            print(f"NO MATCHING VIDEO FOUND for {case_label} {concept_label}")
+            unmatched.append(item)
+
+    print()
+    print(f"Matched: {len(matched)} | Unmatched: {len(unmatched)}")
+    if not matched:
+        print("Nothing to post — exiting.")
+        return
+
+    try:
+        input(
+            f"\nReady to post {len(matched)} matched videos. "
+            f"Press Enter to continue or Ctrl+C to cancel."
+        )
+    except KeyboardInterrupt:
+        print("\nCancelled by user.")
+        return
+
+    print(f"\nConnecting to Chrome on port 9222.\n")
     options = Options()
     options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
     driver = webdriver.Chrome(options=options)
     driver.get("https://www.tiktok.com/tiktokstudio/upload?from=creator_center&tab=video")
 
     scheduled = []
-    skipped = []
     failed = []
 
-    for idx, item in enumerate(queue, start=1):
-        video_name = item.get("videoFile") or ""
+    for idx, (item, video_path) in enumerate(matched, start=1):
         date = item.get("scheduleDate", "?")
         time_str = item.get("scheduleTime", "?")
         platform = item.get("platform", "?")
         archetype = item.get("archetype", "?")
+        case_label = item.get("product", "?")
 
-        print(f"\n[{idx}/{len(queue)}] {date} {time_str} {platform} — {archetype} — {video_name}")
-
-        video_path = find_video(video_name)
-        if not video_path:
-            print(f"   ⚠️  Video '{video_name}' not found under {VIDEO_DIR} — skipping.")
-            skipped.append(item)
-            continue
-
-        print(f"   📹 Found: {video_path}")
-        print(f"   Ready to post: {date} {time_str} {platform} - {archetype} - {video_name}")
+        print(
+            f"\n[{idx}/{len(matched)}] {date} {time_str} {platform} — "
+            f"{case_label} + {archetype} — {video_path.name}"
+        )
 
         # Always start each item on a fresh upload page.
         try:
@@ -560,7 +725,13 @@ def main():
             print(f"   ⚠️  Couldn't reload upload page: {e}")
 
         ok = post_one(driver, item, video_path)
-        (scheduled if ok else failed).append(item)
+        if ok:
+            item["status"] = "posted"
+            scheduled.append(item)
+            # Persist after each success so a crash mid-run still records progress.
+            save_queue(queue)
+        else:
+            failed.append(item)
         human_pause(2, 4)
 
     # ---------- summary ----------
@@ -569,11 +740,17 @@ def main():
     print("=" * 60)
     print(f"✅ Scheduled: {len(scheduled)}")
     for it in scheduled:
-        print(f"   - {it.get('scheduleDate')} {it.get('scheduleTime')} {it.get('platform')}: {it.get('archetype')}")
-    if skipped:
-        print(f"\n⚠️  Skipped (video not found): {len(skipped)}")
-        for it in skipped:
-            print(f"   - {it.get('scheduleDate')} {it.get('scheduleTime')}: {it.get('videoFile')}")
+        print(
+            f"   - {it.get('scheduleDate')} {it.get('scheduleTime')} "
+            f"{it.get('platform')}: {it.get('product')} + {it.get('archetype')}"
+        )
+    if unmatched:
+        print(f"\n⚠️  No matching video: {len(unmatched)}")
+        for it in unmatched:
+            print(
+                f"   - {it.get('scheduleDate')} {it.get('scheduleTime')}: "
+                f"{it.get('product')} + {it.get('archetype')}"
+            )
     if failed:
         print(f"\n❌ Failed: {len(failed)}")
         for it in failed:
