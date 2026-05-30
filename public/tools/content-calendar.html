@@ -174,11 +174,6 @@
     color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
   }
   .export-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16,185,129,.3); }
-  .btn-confirm {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: #fff; padding: 12px 18px; font-size: 15px; font-weight: 700;
-  }
-  .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(16,185,129,.3); }
   .toast {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
     background: #111827; color: #fff; padding: 12px 20px; border-radius: 999px;
@@ -199,6 +194,18 @@
     display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
   }
   .card-actions button:hover { background: var(--pink); color: #fff; border-color: var(--pink); }
+  .card-actions button.act-confirm.is-on {
+    background: #10b981; color: #fff; border-color: #10b981;
+  }
+  .card-actions button.act-confirm.is-on:hover {
+    background: #059669; border-color: #059669;
+  }
+  .card-actions button.act-confirm.is-locked {
+    opacity: .4; cursor: not-allowed;
+  }
+  .card-actions button.act-confirm.is-locked:hover {
+    background: #fff; color: var(--pink-dark); border-color: var(--pink-border);
+  }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(40,10,30,.55);
@@ -443,9 +450,6 @@
     </div>
     <pre class="code-box" id="detailVP"></pre>
     <div class="modal-actions" style="flex-wrap: wrap; margin-top: 18px;">
-      <button type="button" class="btn-confirm" id="detailConfirm" style="flex:1;">Confirm for Posting ✅</button>
-    </div>
-    <div class="modal-actions" style="flex-wrap: wrap;">
       <button type="button" class="btn-primary" id="detailPosted">Mark as posted</button>
       <button type="button" class="btn-ghost" id="detailEdit">Edit</button>
       <button type="button" class="btn-danger" id="detailDelete">Delete</button>
@@ -961,7 +965,7 @@
       "</div>" +
       '<div class="card-actions">' +
         '<button type="button" title="Edit" data-act="edit">✎</button>' +
-        '<button type="button" title="Toggle posted" data-act="posted">' + (status === "posted" ? "↺" : "✓") + "</button>" +
+        confirmBtnHTML(status) +
         '<button type="button" title="Delete" data-act="del">✕</button>' +
       "</div>";
 
@@ -971,11 +975,21 @@
         ev.stopPropagation();
         var act = btn.dataset.act;
         if (act === "edit") openForm(key);
-        else if (act === "posted") togglePosted(key);
+        else if (act === "confirm") toggleConfirm(key);
         else if (act === "del") removeEntry(key);
       });
     });
     return card;
+  }
+
+  function confirmBtnHTML(status) {
+    var locked = status === "scheduled" || status === "posted";
+    var on = status === "confirmed";
+    var cls = "act-confirm" + (on ? " is-on" : "") + (locked ? " is-locked" : "");
+    var title = locked
+      ? "Already " + status
+      : (on ? "Unconfirm (back to planned)" : "Confirm for posting");
+    return '<button type="button" class="' + cls + '" title="' + title + '" data-act="confirm">✓</button>';
   }
 
   function renderStats() {
@@ -1221,9 +1235,6 @@
     document.getElementById("detailVP").textContent = e.videoPrompt || "No video prompt yet.";
     document.getElementById("detailPosted").textContent =
       e.status === "posted" ? "Mark as planned" : "Mark as posted";
-    // The Confirm button is hidden once a card is already confirmed/scheduled/posted.
-    var canConfirm = !e.status || e.status === "planned";
-    document.getElementById("detailConfirm").style.display = canConfirm ? "" : "none";
     closeOverlay("formOverlay");
     openOverlay("detailOverlay");
   }
@@ -1252,13 +1263,16 @@
       openDetail(key);
     }
   }
-  function confirmEntry(key) {
+  function toggleConfirm(key) {
     var e = data[key];
     if (!e) return;
-    e.status = "confirmed";
+    var current = e.status || "planned";
+    // Scheduled/posted cards are past the confirmation step — the checkmark is a no-op.
+    if (current !== "planned" && current !== "confirmed") return;
+    e.status = current === "confirmed" ? "planned" : "confirmed";
     saveData();
     renderCalendar();
-    showToast("Confirmed for posting ✅");
+    showToast(e.status === "confirmed" ? "Confirmed for posting ✅" : "Moved back to planned");
     if (detailKey === key && document.getElementById("detailOverlay").classList.contains("open")) {
       openDetail(key);
     }
@@ -1338,7 +1352,6 @@
   document.getElementById("detailEdit").addEventListener("click", function () { if (detailKey) openForm(detailKey); });
   document.getElementById("detailDelete").addEventListener("click", function () { if (detailKey) removeEntry(detailKey); });
   document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
-  document.getElementById("detailConfirm").addEventListener("click", function () { if (detailKey) confirmEntry(detailKey); });
   document.getElementById("exportBtn").addEventListener("click", exportForPosting);
 
   document.getElementById("shootListCopyAll").addEventListener("click", function () {
