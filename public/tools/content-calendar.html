@@ -174,6 +174,11 @@
     color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
   }
   .export-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16,185,129,.3); }
+  .match-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff; padding: 9px 16px; font-size: 14px; font-weight: 700;
+  }
+  .match-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(59,130,246,.3); }
   .toast {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
     background: #111827; color: #fff; padding: 12px 20px; border-radius: 999px;
@@ -345,6 +350,8 @@
     <button class="nav-btn" id="prevWeek">← Prev</button>
     <button class="today-btn" id="todayBtn">Today</button>
     <button class="export-btn" id="exportBtn">📤 Export for Posting</button>
+    <button class="match-btn" id="autoMatchBtn">🎬 Auto-Match Videos</button>
+    <input type="file" id="autoMatchInput" accept="video/mp4,.mp4" multiple style="display:none">
     <button class="nav-btn" id="nextWeek">Next →</button>
     <div class="range" id="rangeLabel">—</div>
   </div>
@@ -1342,6 +1349,124 @@
     showToast("Exported " + queue.length + " posts ready for scheduling 🎀");
   }
 
+  // ---------- auto-match videos ----------
+  // Filename-fuzzy-match rules. Order matters: more specific rules go first so a
+  // pattern like "giftunbox" routes to Unboxing Surprise Gift instead of also
+  // matching the broader "unbox" rule for ASMR Unboxing.
+  var FILENAME_CASE_RULES = [
+    { product: "Hello Kitty Cherry", patterns: ["hellokitty", "hello", "hkc"] },
+    { product: "Bow Cherry",         patterns: ["bowcherry", "bow_cherry", "bcherry"] },
+    { product: "Bow Diamond",        patterns: ["bowdiamond", "bow_diamond", "bdiamand"] },
+    { product: "Butter Bear",        patterns: ["butterbear", "butter", "bbear"] },
+    { product: "Cherry",             patterns: ["cherry"], exclude: ["bow", "hello"] },
+    { product: "Dachshund",          patterns: ["dachshund", "dach"] },
+    { product: "Mario",              patterns: ["mario"] },
+    { product: "Wavy",               patterns: ["wavy"] },
+    { product: "Puppy",              patterns: ["puppy"] },
+    { product: "Burger",             patterns: ["burger"] }
+  ];
+  var FILENAME_CONCEPT_RULES = [
+    { archetype: "Not Gatekeeping",                 patterns: ["notgatekeep", "not_gate"] },
+    { archetype: "Cases I've Been Gatekeeping",     patterns: ["gatekeep"], exclude: ["notgatekeep", "not_gate"] },
+    { archetype: "Unboxing Surprise Gift",          patterns: ["giftunbox", "gift", "surprise"] },
+    { archetype: "ASMR Unboxing",                   patterns: ["asmr", "unbox"] },
+    { archetype: "Outfit Swap Transition",          patterns: ["outfitswap", "swap"] },
+    { archetype: "POV Outfit Match",                patterns: ["outfitmatch", "outfit", "pov"] },
+    { archetype: "Before/After Ugly Case",          patterns: ["beforeafter", "ugly", "before"] },
+    { archetype: "Girl Math Comedy",                patterns: ["girlmath", "girl_math"] },
+    { archetype: "Which One Matches Your Vibe",     patterns: ["whichone", "vibe"] },
+    { archetype: "Rate My Phone Setup",             patterns: ["desksetup", "desk", "setup"] },
+    { archetype: "Stitch Bait",                     patterns: ["stitch"] },
+    { archetype: "GRWM Morning Routine",            patterns: ["grwm", "morning"] },
+    { archetype: "Satisfying Loop Click",           patterns: ["satisfying", "loop", "click"] },
+    { archetype: "Small Business BTS",              patterns: ["bts", "behind", "packing"] },
+    { archetype: "Fruit Case Trend",                patterns: ["fruittrend", "fruit"] },
+    { archetype: "My Boyfriend Hates It",           patterns: ["boyfriend"] },
+    { archetype: "IT Girl Phone Check",             patterns: ["itgirl", "it_girl"] },
+    { archetype: "Canadian Small Business",         patterns: ["canadian"] },
+    { archetype: "Compliment Magnet",               patterns: ["compliment"] },
+    { archetype: "Nostalgia Hit",                   patterns: ["nostalgia"] },
+    { archetype: "Hand Covers Camera Transition",   patterns: ["handtransition", "handcover"] },
+    { archetype: "Falling Phone Transition",        patterns: ["fallingphone", "falling", "drop"] },
+    { archetype: "PR Package Haul",                 patterns: ["prhaul", "pr_haul"] },
+    { archetype: "Influencer Ranking Haul",         patterns: ["ranking"] },
+    { archetype: "Honest Review 2 Weeks",           patterns: ["honestrev", "honest", "review"] },
+    { archetype: "Should Be Illegal Hook",          patterns: ["illegal"] },
+    { archetype: "Founder Story",                   patterns: ["founder"] },
+    { archetype: "Didn't Know This Existed",        patterns: ["didntknow", "didnt"] }
+  ];
+
+  function applyFilenameRules(filename, rules, field) {
+    var n = String(filename || "").toLowerCase();
+    for (var i = 0; i < rules.length; i++) {
+      var rule = rules[i];
+      var hit = false;
+      for (var j = 0; j < rule.patterns.length; j++) {
+        if (n.indexOf(rule.patterns[j]) !== -1) { hit = true; break; }
+      }
+      if (!hit) continue;
+      if (rule.exclude) {
+        var excluded = false;
+        for (var k = 0; k < rule.exclude.length; k++) {
+          if (n.indexOf(rule.exclude[k]) !== -1) { excluded = true; break; }
+        }
+        if (excluded) continue;
+      }
+      return rule[field];
+    }
+    return null;
+  }
+
+  function autoMatchVideos(files) {
+    if (!files || !files.length) return;
+    var lines = [];
+    var filesMatched = 0;
+    var slotsConfirmed = 0;
+
+    for (var f = 0; f < files.length; f++) {
+      var file = files[f];
+      var name = file.name;
+      var product = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
+      var archetype = applyFilenameRules(name, FILENAME_CONCEPT_RULES, "archetype");
+
+      if (!product || !archetype) {
+        lines.push("❌ " + name + " — couldn't infer " +
+          (!product && !archetype ? "case or concept" :
+           !product ? "case" : "concept"));
+        continue;
+      }
+
+      // One file can match multiple slots — the same (case, concept) combo may
+      // repeat across weeks. Each match flips its slot to confirmed and stamps
+      // the filename onto videoFilePath.
+      var hits = 0;
+      Object.keys(data).forEach(function (key) {
+        var e = data[key];
+        if (!e) return;
+        if (e.product === product && e.archetype === archetype) {
+          e.videoFilePath = name;
+          e.status = "confirmed";
+          hits++;
+        }
+      });
+
+      filesMatched++;
+      slotsConfirmed += hits;
+      lines.push("✓ " + name + " → " + product + " + " + archetype +
+        " (" + hits + " slot" + (hits === 1 ? "" : "s") + ")");
+    }
+
+    saveData();
+    renderCalendar();
+
+    var summary =
+      "✅ Matched " + filesMatched + " of " + files.length + " files.\n" +
+      slotsConfirmed + " calendar slot" + (slotsConfirmed === 1 ? "" : "s") +
+      " confirmed automatically.\n\n" + lines.join("\n");
+    alert(summary);
+    showToast("Auto-matched " + slotsConfirmed + " slot" + (slotsConfirmed === 1 ? "" : "s") + " 🎬");
+  }
+
   // ---------- overlays ----------
   function openOverlay(id) { document.getElementById(id).classList.add("open"); }
   function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
@@ -1353,6 +1478,14 @@
   document.getElementById("detailDelete").addEventListener("click", function () { if (detailKey) removeEntry(detailKey); });
   document.getElementById("detailPosted").addEventListener("click", function () { if (detailKey) togglePosted(detailKey); });
   document.getElementById("exportBtn").addEventListener("click", exportForPosting);
+  document.getElementById("autoMatchBtn").addEventListener("click", function () {
+    document.getElementById("autoMatchInput").click();
+  });
+  document.getElementById("autoMatchInput").addEventListener("change", function (ev) {
+    autoMatchVideos(ev.target.files);
+    // Reset so picking the same files again still fires change.
+    ev.target.value = "";
+  });
 
   document.getElementById("shootListCopyAll").addEventListener("click", function () {
     var btn = this;
