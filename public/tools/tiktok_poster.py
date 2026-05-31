@@ -388,96 +388,101 @@ def _find_input_by_value(driver, predicate) -> Optional[object]:
     return None
 
 
+_MONTH_NAME_TO_NUM = {
+    "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
+    "July": 7, "August": 8, "September": 9, "October": 10, "November": 11,
+    "December": 12,
+}
+
+
+def get_current_calendar_month(driver) -> str:
+    """Return the visible calendar header text, in TikTok's
+    'Month / YYYY' form (e.g. 'May / 2026'). Returns '' if not found.
+
+    Looks for near-leaf visible elements (≤2 children) whose entire
+    trimmed text matches the exact 'Month / YYYY' pattern — that filter
+    avoids the broader containers that also contain weekday labels."""
+    return driver.execute_script(
+        """
+        var els = document.querySelectorAll('*');
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            if (el.children.length <= 2 && el.offsetParent !== null) {
+                var text = (el.textContent || '').trim();
+                if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s*\/\s*20\d{2}$/.test(text)) {
+                    return text;
+                }
+            }
+        }
+        return '';
+        """
+    )
+
+
+def click_next_month_arrow(driver) -> bool:
+    """Click the rightmost narrow visible svg/button — that's the '>'
+    arrow next to the calendar header. Position-based because the arrows
+    don't carry stable aria-labels or class names."""
+    return bool(
+        driver.execute_script(
+            """
+            var svg = document.querySelectorAll('svg, button');
+            var candidates = [];
+            for (var i = 0; i < svg.length; i++) {
+                var el = svg[i];
+                var rect = el.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0 && rect.width < 50) {
+                    candidates.push({el: el, x: rect.x});
+                }
+            }
+            candidates.sort(function (a, b) { return b.x - a.x; });
+            if (candidates.length > 0) {
+                candidates[0].el.click();
+                return true;
+            }
+            return false;
+            """
+        )
+    )
+
+
 def navigate_to_month(driver, target_year: int, target_month: int) -> bool:
-    """Step the calendar forward until its visible header matches the
-    target year + month. TikTok's picker often opens on a stale month
-    (sometimes a year or more behind), so this loop tries many arrow
-    selectors before falling back to clicking the rightmost arrow near
-    the header. Returns True if the target month was reached."""
-    max_clicks = 30
-    month_names = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
-    ]
-    target_month_name = month_names[target_month - 1]
-    for _ in range(max_clicks):
-        # Read the current header. Try Calendar/MonthYear-shaped containers
-        # first, then any visible element whose text contains a recent year.
-        header_text = ""
-        try:
-            header = driver.find_element(
-                By.XPATH,
-                "//*[contains(@class,'CalendarHeader') "
-                "or contains(@class,'calendar-header') "
-                "or contains(@class,'month-year') "
-                "or contains(@class,'MonthYear')]"
-            )
-            header_text = (header.text or "").strip()
-        except Exception:
-            els = driver.find_elements(
-                By.XPATH,
-                "//*[contains(text(), '2024') or contains(text(), '2025') "
-                "or contains(text(), '2026')]"
-            )
-            for el in els:
-                try:
-                    if not el.is_displayed():
-                        continue
-                    t = (el.text or "").strip()
-                    if t:
-                        header_text = t
-                        break
-                except Exception:
-                    continue
+    """Step the calendar forward to (target_year, target_month).
 
-        print(f"   Calendar shows: {header_text}")
+    Reads the header as 'Month / YYYY' each iteration, parses it, and
+    only clicks Next when the current month is strictly before target.
+    Returns True if the target was reached, False if we hit the cap, ran
+    past the target, or couldn't parse the header."""
+    for _ in range(24):
+        header = get_current_calendar_month(driver)
+        print(f"   Calendar shows: {header}")
 
-        if target_month_name in header_text and str(target_year) in header_text:
-            print(f"   Found correct month: {header_text}")
-            return True
-
-        # Try a list of next-arrow selectors. First visible hit wins.
-        next_clicked = False
-        for selector in (
-            "//button[@aria-label='Next month']",
-            "//button[@aria-label='next month']",
-            "//*[@class='next' or @class='Next']",
-            "//button[contains(@class,'next') or contains(@class,'Next') "
-            "or contains(@class,'arrow-right') or contains(@class,'ArrowRight')]",
-            "//*[normalize-space(text())='>']",
-            "//*[normalize-space(text())='›']",
-            "//*[normalize-space(text())='»']",
-        ):
+        if header:
+            parts = [p.strip() for p in header.split("/")]
+            if len(parts) != 2 or parts[0] not in _MONTH_NAME_TO_NUM:
+                print(f"   ⚠️  Unexpected header format: {header!r}")
+                return False
+            current_month = _MONTH_NAME_TO_NUM[parts[0]]
             try:
-                for arrow in driver.find_elements(By.XPATH, selector):
-                    if arrow.is_displayed():
-                        driver.execute_script("arguments[0].click()", arrow)
-                        next_clicked = True
-                        time.sleep(0.3)
-                        break
-            except Exception:
-                pass
-            if next_clicked:
-                break
+                current_year = int(parts[1])
+            except ValueError:
+                print(f"   ⚠️  Couldn't parse year from {header!r}")
+                return False
 
-        if not next_clicked:
-            # Last resort: there are usually two arrows side by side. The
-            # rightmost is forward — click it.
-            try:
-                arrows = driver.find_elements(
-                    By.XPATH,
-                    "//button[contains(@class,'arrow') or contains(@class,'Arrow') "
-                    "or contains(@class,'chevron') or contains(@class,'Chevron')]"
-                )
-                visible_arrows = [a for a in arrows if a.is_displayed()]
-                if len(visible_arrows) >= 2:
-                    driver.execute_script("arguments[0].click()", visible_arrows[-1])
-                    time.sleep(0.3)
-                elif len(visible_arrows) == 1:
-                    driver.execute_script("arguments[0].click()", visible_arrows[0])
-                    time.sleep(0.3)
-            except Exception:
-                pass
+            if (current_year, current_month) == (target_year, target_month):
+                print(f"   Found correct month: {header}")
+                return True
+            if (current_year, current_month) > (target_year, target_month):
+                # The picker opened past the target — we only step forward.
+                print(f"   ⚠️  Calendar at {header}, past target")
+                return False
+
+        if not click_next_month_arrow(driver):
+            print("   ⚠️  Couldn't find a next-month arrow")
+            return False
+        time.sleep(0.5)
+
+    print("   ⚠️  Hit 24-month nav cap without reaching target")
     return False
 
 
@@ -520,20 +525,23 @@ def click_calendar_day(driver, day_number: int) -> bool:
 
 
 def scroll_time_picker_columns_to_top(driver) -> None:
-    """Scroll every narrow-and-tall scrollable container on the page to
-    its top. Early hours like '07' sit at the very top of TikTok's hour
-    column, so if the column has scrolled past them (e.g. centered on
-    current time) the click-by-text helpers won't see the element."""
+    """Scroll any narrow scrollable picker column to its top.
+
+    The hour column opens centered on the current hour (TikTok shows
+    ~16-22 by default), so early hours like '07' aren't even rendered
+    until we rewind the column. Tight heuristics so we don't accidentally
+    rewind the page itself or some side rail: real overflow with a 10px
+    buffer, visible, narrow (0 < width < 80), and tall enough (> 50)."""
     driver.execute_script(
         """
         var all = document.querySelectorAll('*');
         for (var i = 0; i < all.length; i++) {
             var el = all[i];
-            if (el.scrollHeight <= el.clientHeight) continue;
-            if (!el.offsetParent) continue;
             var rect = el.getBoundingClientRect();
-            // Narrow + tall = a picker column, not the page.
-            if (rect.width < 100 && rect.height > 100) {
+            if (el.scrollHeight > el.clientHeight + 10
+                && rect.width > 0 && rect.width < 80
+                && rect.height > 50
+                && el.offsetParent !== null) {
                 el.scrollTop = 0;
             }
         }
