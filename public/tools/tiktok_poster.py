@@ -103,6 +103,7 @@ CASE_ALIASES = {
     "Burger": ["burger"],
     "Butter Bear": ["butterbear", "butter_bear", "bbear"],
     "Bow Diamond": ["bowdiamond", "bow_diamond", "bdiamand"],
+    "Bow Black": ["bowblack", "bow_black", "blackbow"],
 }
 
 CONCEPT_ALIASES = {

@@ -505,7 +505,7 @@
   var PLATFORMS = ["TikTok", "Instagram", "Both"];
   var PRODUCTS = [
     "Dachshund", "Butter Bear", "Puppy", "Hello Kitty Cherry", "Bow Cherry",
-    "Cherry", "Burger", "Mario", "Wavy", "Bow Diamond"
+    "Cherry", "Burger", "Mario", "Wavy", "Bow Diamond", "Bow Black"
   ];
   var ARCHETYPES = [
     "ASMR Unboxing", "Before/After Ugly Case", "POV Outfit Match", "Girl Math Comedy",
@@ -546,7 +546,8 @@
     "Puppy": "puppy",
     "Burger": "burger",
     "Butter Bear": "butterbear",
-    "Bow Diamond": "bowdiamond"
+    "Bow Diamond": "bowdiamond",
+    "Bow Black": "bowblack"
   };
   var DAY_ABBREVS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   // Short slugs used for the shoot list filename ([case]_[archetype].mp4). Each
@@ -797,7 +798,7 @@
   // insert with preset + rendered videoPrompt.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v13"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v14"); } catch (e) { return; }
     if (seeded != null) return;
 
     var existing = {};
@@ -843,7 +844,7 @@
       }
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v13", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v14", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
@@ -1386,6 +1387,7 @@
     { product: "Hello Kitty Cherry", patterns: ["hellokitty", "hello", "hkc"] },
     { product: "Bow Cherry",         patterns: ["bowcherry", "bow_cherry", "bcherry"] },
     { product: "Bow Diamond",        patterns: ["bowdiamond", "bow_diamond", "bdiamand"] },
+    { product: "Bow Black",          patterns: ["bowblack", "bow_black", "bow-black", "blackbow"] },
     { product: "Butter Bear",        patterns: ["butterbear", "butter", "bbear"] },
     { product: "Cherry",             patterns: ["cherry"], exclude: ["bow", "hello"] },
     { product: "Dachshund",          patterns: ["dachshund", "dach"] },
