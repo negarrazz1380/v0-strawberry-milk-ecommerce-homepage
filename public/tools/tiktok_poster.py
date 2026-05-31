@@ -57,8 +57,13 @@ except ImportError:
 
 HOME = Path.home()
 BASE_DIR = HOME / "Desktop" / "CaseKisses"
-QUEUE_PATH = BASE_DIR / "posting-queue.json"
-VIDEO_DIR = BASE_DIR / "videos"
+# The GUI wrapper (casekisses_poster.py) sets these env vars to whatever
+# paths the operator picked in the file dialogs. Standalone CLI runs fall
+# back to the canonical CaseKisses layout under ~/Desktop.
+_env_queue = os.environ.get("CK_QUEUE_PATH")
+_env_videos = os.environ.get("CK_VIDEO_DIR")
+QUEUE_PATH = Path(_env_queue) if _env_queue else BASE_DIR / "posting-queue.json"
+VIDEO_DIR = Path(_env_videos) if _env_videos else BASE_DIR / "videos"
 ROUND_COMPLETE_PATH = BASE_DIR / "round-complete.json"
 
 # ---------- helpers ----------
