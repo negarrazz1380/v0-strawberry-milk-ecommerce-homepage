@@ -481,6 +481,91 @@ def navigate_to_month(driver, target_year: int, target_month: int) -> bool:
     return False
 
 
+def click_calendar_day(driver, day_number: int) -> bool:
+    """Click the calendar cell whose text exactly equals `day_number`.
+
+    XPath alone was unreliable here because TikTok's day cell often wraps
+    the visible number alongside aria-labels or screenreader-only helper
+    text, so `normalize-space(text())='30'` either matched a wrong sibling
+    or skipped the cell. Running the lookup in JS lets us combine: real
+    visibility (`offsetParent`), exact `textContent` match, a calendar-
+    grid context (td / gridcell / Day*/Cell*), and an exclusion list for
+    grayed-out adjacent-month cells — all in one pass."""
+    day_str = str(int(day_number))
+    result = driver.execute_script(
+        """
+        var day = arguments[0];
+        var candidates = document.querySelectorAll(
+            'td, [role="gridcell"], [role="button"], '
+            + '[class*="Day"], [class*="day"], [class*="Cell"], [class*="cell"]'
+        );
+        for (var i = 0; i < candidates.length; i++) {
+            var el = candidates[i];
+            if (!el.offsetParent) continue;
+            var text = (el.textContent || '').trim();
+            if (text !== day) continue;
+            var classes = (el.className || '').toString();
+            if (classes.includes('disabled') || classes.includes('gray')
+                || classes.includes('outside') || classes.includes('prev')
+                || classes.includes('next')) continue;
+            el.click();
+            return 'clicked ' + text;
+        }
+        return 'not found';
+        """,
+        day_str,
+    )
+    print(f"   Day click result: {result}")
+    return "clicked" in str(result)
+
+
+def scroll_time_picker_columns_to_top(driver) -> None:
+    """Scroll every narrow-and-tall scrollable container on the page to
+    its top. Early hours like '07' sit at the very top of TikTok's hour
+    column, so if the column has scrolled past them (e.g. centered on
+    current time) the click-by-text helpers won't see the element."""
+    driver.execute_script(
+        """
+        var all = document.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.scrollHeight <= el.clientHeight) continue;
+            if (!el.offsetParent) continue;
+            var rect = el.getBoundingClientRect();
+            // Narrow + tall = a picker column, not the page.
+            if (rect.width < 100 && rect.height > 100) {
+                el.scrollTop = 0;
+            }
+        }
+        """
+    )
+    time.sleep(0.5)
+
+
+def _click_picker_value_js(driver, value: str) -> bool:
+    """JS fallback for the time picker: find any visible element whose
+    trimmed `textContent` exactly equals `value` and click it. Tried after
+    `_click_text_in_picker` misses — the XPath form requires a text leaf,
+    while this form clicks whatever wrapper actually matches."""
+    return bool(
+        driver.execute_script(
+            """
+            var v = arguments[0];
+            var all = document.querySelectorAll('*');
+            for (var i = 0; i < all.length; i++) {
+                var el = all[i];
+                if (!el.offsetParent) continue;
+                if ((el.textContent || '').trim() !== v) continue;
+                el.click();
+                return true;
+            }
+            return false;
+            """,
+            str(value),
+        )
+    )
+
+
 def set_schedule_datetime(driver, date_str: str, time_str: str) -> None:
     """Drive TikTok's custom date and time pickers in one shot.
 
@@ -523,37 +608,16 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> None:
 
             navigate_to_month(driver, target.year, target.month)
 
-            # Click the day. Try cells that explicitly aren't disabled or
-            # grayed first, then fall back to broader text matches.
-            day_clicked = False
-            for xp in (
-                f"//td[normalize-space(text())='{target_day_str}' "
-                f"and not(contains(@class,'disabled')) "
-                f"and not(contains(@class,'gray')) "
-                f"and not(contains(@class,'other-month'))]",
-                f"//td[normalize-space(text())='{target_day_str}']",
-                f"//div[normalize-space(text())='{target_day_str}']",
-                f"//span[normalize-space(text())='{target_day_str}']",
-            ):
-                for el in driver.find_elements(By.XPATH, xp):
-                    try:
-                        if not el.is_displayed():
-                            continue
-                        driver.execute_script("arguments[0].click()", el)
-                        print(f"   Clicked day {target_day_str}")
-                        day_clicked = True
-                        break
-                    except Exception:
-                        continue
-                if day_clicked:
-                    break
-            if not day_clicked:
+            if not click_calendar_day(driver, target.day):
                 print(f"   ⚠️  Couldn't click day {target_day_str}")
 
-            # Wait for the click to register, then close the calendar.
+            # Wait for the click to register, then press Escape — the
+            # calendar swallows outside-clicks in some builds, so Escape
+            # is the cleanest way to dismiss it before opening the time
+            # picker.
             time.sleep(1)
             try:
-                driver.find_element(By.TAG_NAME, "body").click()
+                ActionChains(driver).send_keys(Keys.ESCAPE).perform()
             except Exception:
                 pass
             time.sleep(0.5)
@@ -586,12 +650,16 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> None:
             return
         driver.execute_script("arguments[0].click()", time_input)
         time.sleep(1.5)
-        if _click_text_in_picker(driver, hour_str):
+        # Early hours (e.g. 07) sit at the top of the hour column. If the
+        # column opened scrolled past them they're not in the DOM yet —
+        # rewind both columns to the top before clicking.
+        scroll_time_picker_columns_to_top(driver)
+        if _click_text_in_picker(driver, hour_str) or _click_picker_value_js(driver, hour_str):
             print(f"   Clicked hour {hour_str}")
         else:
             print(f"   ⚠️  Couldn't click hour {hour_str}")
         time.sleep(0.5)
-        if _click_text_in_picker(driver, minute_str):
+        if _click_text_in_picker(driver, minute_str) or _click_picker_value_js(driver, minute_str):
             print(f"   Clicked minute {minute_str}")
         else:
             print(f"   ⚠️  Couldn't click minute {minute_str}")
