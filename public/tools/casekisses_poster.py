@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Case Kisses Poster — desktop GUI wrapper around tiktok_poster.py.
+"""Case Kisses Poster — local web UI wrapper for tiktok_poster.py.
 
-Spawns tiktok_poster.py as a subprocess, streams its stdout into a
-scrolling log, exposes file pickers for the queue + videos folder
-(persisted to ~/Desktop/CaseKisses/config.json), and surfaces a Start /
-Stop pair plus an X-of-Y progress bar parsed from the worker's output.
+Spins up an HTTP server on localhost:8765 and opens the default browser.
+The single-page UI offers two path inputs (with native macOS file pickers
+via `osascript`), Start/Stop buttons, a live SSE log, and a progress bar.
+
+Standard library only — no Flask, no Jinja, no tkinter.
 """
 
 from __future__ import annotations
 
+import http.server
 import json
 import os
 import queue
@@ -16,32 +18,36 @@ import re
 import subprocess
 import sys
 import threading
-from datetime import datetime
+import time
+import webbrowser
 from pathlib import Path
-
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from urllib.parse import parse_qs, urlparse
 
 
+PORT = 8765
 HOME = Path.home()
 BASE_DIR = HOME / "Desktop" / "CaseKisses"
 CONFIG_PATH = BASE_DIR / "config.json"
 SCRIPT_PATH = Path(__file__).resolve().parent / "tiktok_poster.py"
-
 DEFAULT_VIDEO_DIR = BASE_DIR / "videos"
 DEFAULT_QUEUE_PATH = BASE_DIR / "posting-queue.json"
 
-PINK_BG = "#fdf2f8"
-PINK_SOFT = "#fce7f3"
-PINK_BORDER = "#f9a8d4"
-PINK = "#ec4899"
-PINK_DARK = "#be185d"
-RED = "#ef4444"
-RED_DARK = "#b91c1c"
-INK = "#1f2937"
-MUTED = "#6b7280"
+# Module-level state shared by the HTTP handlers and the worker thread.
+# `_state_lock` guards every mutation of the lists/process below; numeric
+# counters are written only from the worker thread so reads are torn-but-
+# harmless.
+_state_lock = threading.Lock()
+_subscribers: list[queue.Queue] = []  # one queue per live SSE connection
+_process: subprocess.Popen | None = None
+_worker_thread: threading.Thread | None = None
+_posted_count = 0
+_total_planned = 0
+_stop_requested = False
+
+_ITEM_RE = re.compile(r"^\[(\d+)/(\d+)\]")
 
 
+# ---------- config ----------
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         return {}
@@ -61,359 +67,677 @@ def save_config(cfg: dict) -> None:
         pass
 
 
-class PosterApp:
-    def __init__(self, root: tk.Tk) -> None:
-        self.root = root
-        self.root.title("Case Kisses Poster 🎀")
-        self.root.configure(bg=PINK_BG)
-        self.root.geometry("600x700")
-        self.root.minsize(540, 600)
-
-        self.config = load_config()
-        self.video_dir = self.config.get("video_dir", str(DEFAULT_VIDEO_DIR))
-        self.queue_path = self.config.get("queue_path", str(DEFAULT_QUEUE_PATH))
-
-        self.process: subprocess.Popen | None = None
-        self.worker_thread: threading.Thread | None = None
-        self.stop_requested = False
-        self.posted_so_far = 0
-        self.total_planned = 0
-        self.log_queue: queue.Queue = queue.Queue()
-
-        self._build_ui()
-        # Poll the cross-thread queue from the Tk main loop.
-        self.root.after(100, self._drain_log_queue)
-
-    # ---------- UI ----------
-    def _build_ui(self) -> None:
-        # --- Top: title + status + progress ---
-        top = tk.Frame(self.root, bg=PINK_BG)
-        top.pack(fill=tk.X, padx=20, pady=(18, 6))
-
-        tk.Label(
-            top,
-            text="Case Kisses Poster 🎀",
-            bg=PINK_BG, fg=PINK_DARK,
-            font=("Helvetica", 20, "bold"),
-            anchor=tk.W,
-        ).pack(fill=tk.X)
-
-        self.status_var = tk.StringVar(
-            value="Ready. Pick your queue + videos folder, then click Start."
-        )
-        tk.Label(
-            top, textvariable=self.status_var,
-            bg=PINK_BG, fg=INK,
-            font=("Helvetica", 12),
-            wraplength=560, justify=tk.LEFT, anchor=tk.W,
-        ).pack(fill=tk.X, pady=(10, 4))
-
-        self.progress_var = tk.StringVar(value="0 of 0 posts")
-        tk.Label(
-            top, textvariable=self.progress_var,
-            bg=PINK_BG, fg=MUTED,
-            font=("Helvetica", 11),
-            anchor=tk.W,
-        ).pack(fill=tk.X)
-
-        self.progress = ttk.Progressbar(
-            top, orient="horizontal", mode="determinate", length=560,
-        )
-        self.progress.pack(fill=tk.X, pady=(4, 0))
-
-        # --- Middle: file pickers + start/stop ---
-        mid = tk.Frame(self.root, bg=PINK_BG)
-        mid.pack(fill=tk.X, padx=20, pady=(14, 6))
-
-        self.videos_path_var = tk.StringVar(value=self.video_dir)
-        self._build_picker_row(
-            mid, "📂 Select Videos Folder", self._pick_videos_dir, self.videos_path_var
-        )
-
-        self.queue_path_var = tk.StringVar(value=self.queue_path)
-        self._build_picker_row(
-            mid, "📋 Select Queue File", self._pick_queue_file, self.queue_path_var
-        )
-
-        actions = tk.Frame(mid, bg=PINK_BG)
-        actions.pack(fill=tk.X, pady=(14, 4))
-
-        self.start_btn = tk.Button(
-            actions, text="🚀 Start Posting",
-            command=self._start_posting,
-            bg=PINK, fg="#ffffff",
-            activebackground=PINK_DARK, activeforeground="#ffffff",
-            relief=tk.FLAT, bd=0,
-            padx=22, pady=12,
-            font=("Helvetica", 14, "bold"),
-            cursor="hand2",
-        )
-        self.start_btn.pack(side=tk.LEFT, padx=(0, 8))
-
-        self.stop_btn = tk.Button(
-            actions, text="⏹ Stop",
-            command=self._stop_posting,
-            bg=RED, fg="#ffffff",
-            activebackground=RED_DARK, activeforeground="#ffffff",
-            relief=tk.FLAT, bd=0,
-            padx=18, pady=12,
-            font=("Helvetica", 14, "bold"),
-            cursor="hand2",
-            state=tk.DISABLED,
-        )
-        self.stop_btn.pack(side=tk.LEFT)
-
-        # --- Bottom: log area ---
-        bottom = tk.Frame(self.root, bg=PINK_BG)
-        bottom.pack(fill=tk.BOTH, expand=True, padx=20, pady=(8, 18))
-
-        tk.Label(
-            bottom, text="Log",
-            bg=PINK_BG, fg=PINK_DARK,
-            font=("Helvetica", 12, "bold"),
-            anchor=tk.W,
-        ).pack(anchor=tk.W)
-
-        log_frame = tk.Frame(bottom, bg=PINK_BORDER, bd=1)
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
-
-        scrollbar = tk.Scrollbar(log_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.log_text = tk.Text(
-            log_frame,
-            bg="#ffffff", fg=INK,
-            font=("Menlo", 11),
-            wrap=tk.WORD,
-            yscrollcommand=scrollbar.set,
-            state=tk.DISABLED,
-            relief=tk.FLAT, bd=0,
-            padx=8, pady=8,
-        )
-        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.log_text.yview)
-
-    def _build_picker_row(self, parent, label, command, path_var) -> None:
-        row = tk.Frame(parent, bg=PINK_BG)
-        row.pack(fill=tk.X, pady=3)
-        tk.Button(
-            row, text=label,
-            command=command,
-            bg="#ffffff", fg=PINK_DARK,
-            activebackground=PINK_SOFT, activeforeground=PINK_DARK,
-            relief=tk.SOLID, bd=1,
-            padx=12, pady=6,
-            font=("Helvetica", 12),
-            cursor="hand2",
-        ).pack(side=tk.LEFT)
-        tk.Label(
-            row, textvariable=path_var,
-            bg=PINK_BG, fg=MUTED,
-            font=("Helvetica", 10),
-            anchor=tk.W, justify=tk.LEFT,
-            wraplength=400,
-        ).pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
-
-    # ---------- file pickers ----------
-    def _pick_videos_dir(self) -> None:
-        start = self.video_dir if Path(self.video_dir).exists() else str(HOME)
-        path = filedialog.askdirectory(title="Select videos folder", initialdir=start)
-        if path:
-            self.video_dir = path
-            self.videos_path_var.set(path)
-            self.config["video_dir"] = path
-            save_config(self.config)
-            self._log(f"📂 Videos folder: {path}")
-
-    def _pick_queue_file(self) -> None:
-        parent = Path(self.queue_path).parent
-        start = str(parent) if parent.exists() else str(HOME)
-        path = filedialog.askopenfilename(
-            title="Select queue file",
-            initialdir=start,
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        )
-        if path:
-            self.queue_path = path
-            self.queue_path_var.set(path)
-            self.config["queue_path"] = path
-            save_config(self.config)
-            self._log(f"📋 Queue: {path}")
-
-    # ---------- start / stop ----------
-    def _start_posting(self) -> None:
-        if self.worker_thread and self.worker_thread.is_alive():
-            return
-        if not Path(self.queue_path).exists():
-            messagebox.showerror(
-                "Queue not found", f"Queue file not found:\n{self.queue_path}"
-            )
-            return
-        if not Path(self.video_dir).exists():
-            messagebox.showerror(
-                "Videos folder not found",
-                f"Videos folder not found:\n{self.video_dir}",
-            )
-            return
-        if not SCRIPT_PATH.exists():
-            messagebox.showerror(
-                "tiktok_poster.py missing", f"Expected at:\n{SCRIPT_PATH}"
-            )
-            return
-
-        self.stop_requested = False
-        self.posted_so_far = 0
-        self.total_planned = 0
-        self.start_btn.config(state=tk.DISABLED)
-        self.stop_btn.config(state=tk.NORMAL)
-        self._set_status("Launching tiktok_poster.py… make sure Chrome is open on port 9222.")
-        self._set_progress(0, 0)
-        self._log("🚀 Starting tiktok_poster.py")
-
-        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
-        self.worker_thread.start()
-
-    def _stop_posting(self) -> None:
-        self.stop_requested = True
-        if self.process and self.process.poll() is None:
-            try:
-                self.process.terminate()
-            except Exception:
-                pass
-        self._set_status("Stop requested.")
-        self.stop_btn.config(state=tk.DISABLED)
-
-    # ---------- worker ----------
-    def _worker(self) -> None:
-        # tiktok_poster.py reads CK_QUEUE_PATH / CK_VIDEO_DIR so the GUI's
-        # picked paths actually drive the run.
-        env = os.environ.copy()
-        env["CK_VIDEO_DIR"] = self.video_dir
-        env["CK_QUEUE_PATH"] = self.queue_path
-        env["PYTHONUNBUFFERED"] = "1"
-
+# ---------- broadcast ----------
+def broadcast(event_type: str, data) -> None:
+    """Push an event to every currently connected SSE subscriber."""
+    payload = json.dumps({"type": event_type, "data": data})
+    with _state_lock:
+        snapshot = list(_subscribers)
+    for q in snapshot:
         try:
-            self.process = subprocess.Popen(
-                [sys.executable, str(SCRIPT_PATH)],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                text=True,
-                bufsize=1,
-            )
-        except Exception as e:
-            self._enqueue("log", f"❌ Failed to start subprocess: {e}")
-            self._enqueue("done", (-1, 0))
-            return
-
-        # tiktok_poster.py prints STEP 1-4 instructions then waits on input()
-        # for the operator to confirm Chrome is open. The GUI's status label
-        # already told them; satisfy the input() unconditionally.
-        try:
-            assert self.process.stdin is not None
-            self.process.stdin.write("\n")
-            self.process.stdin.flush()
+            q.put_nowait(payload)
         except Exception:
             pass
 
-        assert self.process.stdout is not None
-        for line in self.process.stdout:
-            if self.stop_requested:
-                break
-            line = line.rstrip("\n")
-            if line:
-                self._enqueue("log", line)
-                self._parse_progress(line)
 
-        rc = self.process.wait() if self.process else -1
-        self._enqueue("done", (rc, self.posted_so_far))
+# ---------- worker ----------
+def _worker(video_dir: str, queue_path: str) -> None:
+    """Spawn tiktok_poster.py with the picked paths, stream its stdout
+    line by line, broadcast log + progress events to SSE clients."""
+    global _process, _posted_count, _total_planned
 
-    # Parse the worker's stdout for X-of-Y position and per-post completion.
-    _ITEM_RE = re.compile(r"^\[(\d+)/(\d+)\]")
+    env = os.environ.copy()
+    env["CK_VIDEO_DIR"] = video_dir
+    env["CK_QUEUE_PATH"] = queue_path
+    env["PYTHONUNBUFFERED"] = "1"
 
-    def _parse_progress(self, line: str) -> None:
-        m = self._ITEM_RE.match(line)
+    try:
+        _process = subprocess.Popen(
+            [sys.executable, str(SCRIPT_PATH)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            text=True,
+            bufsize=1,
+        )
+    except Exception as e:
+        broadcast("log", f"❌ Failed to start subprocess: {e}")
+        broadcast("done", {"rc": -1, "posted": 0, "stopped": False})
+        return
+
+    # tiktok_poster.py prints STEP 1-4 instructions then waits on input().
+    # The web UI's status banner already told the operator to launch Chrome
+    # on port 9222 first; satisfy the prompt automatically.
+    try:
+        assert _process.stdin is not None
+        _process.stdin.write("\n")
+        _process.stdin.flush()
+    except Exception:
+        pass
+
+    assert _process.stdout is not None
+    for line in _process.stdout:
+        if _stop_requested:
+            break
+        line = line.rstrip("\n")
+        if not line:
+            continue
+        broadcast("log", line)
+        m = _ITEM_RE.match(line)
         if m:
             cur = int(m.group(1))
             total = int(m.group(2))
-            self.total_planned = total
-            self._enqueue("progress", (cur, total))
-            self._enqueue("status", f"Posting {cur} of {total}…")
-            return
-        if "✅ Posted:" in line:
-            self.posted_so_far += 1
-            self._enqueue("progress", (self.posted_so_far, self.total_planned))
+            _total_planned = total
+            broadcast("progress", {"current": cur, "total": total})
+            broadcast("status", f"Posting {cur} of {total}…")
+        elif "✅ Posted:" in line:
+            _posted_count += 1
+            broadcast(
+                "progress",
+                {"current": _posted_count, "total": _total_planned},
+            )
 
-    # ---------- queue plumbing ----------
-    def _enqueue(self, kind: str, payload) -> None:
-        self.log_queue.put((kind, payload))
+    rc = _process.wait() if _process else -1
+    broadcast(
+        "done",
+        {"rc": rc, "posted": _posted_count, "stopped": _stop_requested},
+    )
 
-    def _drain_log_queue(self) -> None:
+
+# ---------- native file picker (macOS osascript) ----------
+def native_pick(kind: str) -> tuple[bool, str]:
+    """Show a native macOS Choose Folder / Choose File dialog and return
+    (ok, path_or_error). Cancellation returns (False, ""). `kind` is
+    "folder" or "file"."""
+    if kind == "folder":
+        script = 'POSIX path of (choose folder with prompt "Select videos folder")'
+    else:
+        script = 'POSIX path of (choose file with prompt "Select queue file")'
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+    except FileNotFoundError:
+        return False, "osascript not available (macOS-only picker)"
+    except Exception as e:
+        return False, f"{e.__class__.__name__}: {e}"
+    if result.returncode == 0:
+        return True, result.stdout.strip()
+    # osascript returns 1 on user cancel; treat as silent.
+    return False, ""
+
+
+# ---------- HTML ----------
+HTML_PAGE = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Case Kisses Poster 🎀</title>
+<style>
+  :root {
+    --pink: #ec4899;
+    --pink-dark: #be185d;
+    --pink-bg: #fdf2f8;
+    --pink-soft: #fce7f3;
+    --pink-border: #f9a8d4;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --red: #ef4444;
+    --red-dark: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--pink-bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    padding: 24px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  h1 {
+    color: var(--pink-dark);
+    margin: 0 0 6px 0;
+    font-size: 26px;
+  }
+  .status {
+    margin: 10px 0 6px 0;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .progress-label {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 6px 0 4px 0;
+  }
+  .progress {
+    width: 100%;
+    height: 10px;
+    background: var(--pink-soft);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--pink), var(--pink-dark));
+    transition: width 0.3s ease;
+  }
+  .picker-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .picker-row label {
+    font-weight: 600;
+    color: var(--pink-dark);
+    width: 110px;
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+  .picker-row input[type="text"] {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1.5px solid var(--pink-border);
+    border-radius: 8px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    background: #fff;
+    min-width: 0;
+  }
+  .picker-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+  }
+  .browse-btn {
+    background: #fff;
+    color: var(--pink-dark);
+    border: 1.5px solid var(--pink-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .browse-btn:hover { background: var(--pink-soft); }
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin: 18px 0 14px 0;
+  }
+  .start-btn, .stop-btn {
+    padding: 14px 22px;
+    border: 0;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+  }
+  .start-btn {
+    background: linear-gradient(135deg, var(--pink), #f43f5e);
+  }
+  .start-btn:hover:not([disabled]) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.3);
+  }
+  .stop-btn {
+    background: linear-gradient(135deg, var(--red), var(--red-dark));
+  }
+  .stop-btn:hover:not([disabled]) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3);
+  }
+  .start-btn[disabled], .stop-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .log-title {
+    color: var(--pink-dark);
+    font-weight: 700;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .log {
+    background: #fff;
+    border: 1.5px solid var(--pink-border);
+    border-radius: 10px;
+    padding: 12px;
+    height: 360px;
+    overflow-y: auto;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .log .line { margin-bottom: 2px; }
+  .log .ts { color: var(--muted); margin-right: 4px; }
+  .footer {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<h1>Case Kisses Poster 🎀</h1>
+<div class="status" id="status">Ready. Pick your queue + videos folder, then click Start.</div>
+<div class="progress-label" id="progress-label">0 of 0 posts</div>
+<div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+
+<div class="picker-row">
+  <label>Videos folder</label>
+  <input type="text" id="video-dir" placeholder="/Users/.../CaseKisses/videos">
+  <button class="browse-btn" id="browse-videos">📂 Browse</button>
+</div>
+<div class="picker-row">
+  <label>Queue file</label>
+  <input type="text" id="queue-path" placeholder="/Users/.../CaseKisses/posting-queue.json">
+  <button class="browse-btn" id="browse-queue">📋 Browse</button>
+</div>
+
+<div class="actions">
+  <button class="start-btn" id="start-btn">🚀 Start Posting</button>
+  <button class="stop-btn" id="stop-btn" disabled>⏹ Stop</button>
+</div>
+
+<div class="log-title">Log</div>
+<div class="log" id="log"></div>
+<div class="footer">Local web UI on port 8765 — close this tab and Ctrl-C the terminal to quit.</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const logEl = $("log");
+const statusEl = $("status");
+const progressBar = $("progress-bar");
+const progressLabel = $("progress-label");
+const startBtn = $("start-btn");
+const stopBtn = $("stop-btn");
+const videoDir = $("video-dir");
+const queuePath = $("queue-path");
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function appendLog(line) {
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const div = document.createElement("div");
+  div.className = "line";
+  div.innerHTML = '<span class="ts">[' + ts + ']</span>' + escapeHtml(line);
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setProgress(current, total) {
+  progressLabel.textContent = current + " of " + total + " posts";
+  const pct = total > 0 ? (current / total) * 100 : 0;
+  progressBar.style.width = pct + "%";
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function saveConfig() {
+  fetch("/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ video_dir: videoDir.value, queue_path: queuePath.value })
+  }).catch(() => {});
+}
+
+// Initial config load
+fetch("/config")
+  .then((r) => r.json())
+  .then((cfg) => {
+    if (cfg.video_dir) videoDir.value = cfg.video_dir;
+    if (cfg.queue_path) queuePath.value = cfg.queue_path;
+  })
+  .catch(() => {});
+
+videoDir.addEventListener("blur", saveConfig);
+queuePath.addEventListener("blur", saveConfig);
+
+$("browse-videos").addEventListener("click", async () => {
+  try {
+    const r = await fetch("/browse?type=folder").then((r) => r.json());
+    if (r && r.ok && r.path) {
+      videoDir.value = r.path;
+      saveConfig();
+    } else if (r && r.error) {
+      alert(r.error);
+    }
+  } catch (e) {
+    alert("Browse failed: " + e);
+  }
+});
+
+$("browse-queue").addEventListener("click", async () => {
+  try {
+    const r = await fetch("/browse?type=file").then((r) => r.json());
+    if (r && r.ok && r.path) {
+      queuePath.value = r.path;
+      saveConfig();
+    } else if (r && r.error) {
+      alert(r.error);
+    }
+  } catch (e) {
+    alert("Browse failed: " + e);
+  }
+});
+
+startBtn.addEventListener("click", async () => {
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  setStatus("Launching tiktok_poster.py… make sure Chrome is open on port 9222.");
+  appendLog("🚀 Starting tiktok_poster.py");
+  try {
+    const r = await fetch("/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ video_dir: videoDir.value, queue_path: queuePath.value })
+    }).then((r) => r.json());
+    if (!r.ok) {
+      appendLog("❌ " + (r.error || "failed to start"));
+      setStatus("Failed to start.");
+      alert(r.error || "Failed to start");
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+  } catch (e) {
+    appendLog("❌ " + e);
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+});
+
+stopBtn.addEventListener("click", async () => {
+  stopBtn.disabled = true;
+  await fetch("/stop", { method: "POST" }).catch(() => {});
+  appendLog("⏹ Stop requested");
+});
+
+// Server-Sent Events
+const es = new EventSource("/events");
+es.onmessage = (ev) => {
+  let msg;
+  try { msg = JSON.parse(ev.data); } catch { return; }
+  if (msg.type === "log") {
+    appendLog(msg.data);
+  } else if (msg.type === "status") {
+    setStatus(msg.data);
+  } else if (msg.type === "progress") {
+    setProgress(msg.data.current, msg.data.total);
+  } else if (msg.type === "hello") {
+    if (msg.data && msg.data.total > 0) {
+      setProgress(msg.data.posted || 0, msg.data.total);
+    }
+  } else if (msg.type === "done") {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    const posted = (msg.data && msg.data.posted) || 0;
+    if (msg.data && msg.data.stopped) {
+      setStatus("Stopped. " + posted + " posted.");
+      alert("Posting was stopped.\n" + posted + " video(s) posted.");
+    } else if (msg.data && msg.data.rc === 0) {
+      setStatus("Done. " + posted + " posted.");
+      alert("✅ " + posted + " videos posted successfully");
+    } else {
+      const rc = (msg.data && msg.data.rc);
+      setStatus("Subprocess exited with code " + rc + ".");
+      alert("Subprocess exited with code " + rc + ". " + posted + " posted.");
+    }
+  }
+};
+es.onerror = () => { /* browser auto-retries */ };
+</script>
+</body>
+</html>
+"""
+
+
+# ---------- HTTP handler ----------
+class Handler(http.server.BaseHTTPRequestHandler):
+    # Quiet the per-request access log so the terminal stays readable.
+    def log_message(self, format, *args):  # noqa: A002
+        pass
+
+    # --- response helpers ---
+    def _send_json(self, status: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self) -> dict:
         try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except Exception:
+            length = 0
+        if length <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length))
+        except Exception:
+            return {}
+
+    # --- GET routing ---
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/" or path == "/index.html":
+            body = HTML_PAGE.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == "/config":
+            self._send_json(200, load_config())
+            return
+
+        if path == "/browse":
+            qs = parse_qs(parsed.query)
+            kind = (qs.get("type") or ["folder"])[0]
+            ok, value = native_pick("folder" if kind == "folder" else "file")
+            if ok:
+                self._send_json(200, {"ok": True, "path": value})
+            elif value:
+                self._send_json(200, {"ok": False, "error": value})
+            else:
+                self._send_json(200, {"ok": False, "cancelled": True})
+            return
+
+        if path == "/events":
+            self._serve_sse()
+            return
+
+        self.send_error(404)
+
+    # --- SSE stream ---
+    def _serve_sse(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        q: queue.Queue = queue.Queue()
+        with _state_lock:
+            _subscribers.append(q)
+        try:
+            # Initial snapshot so a late-joining tab can sync progress.
+            self._sse_write(
+                json.dumps({
+                    "type": "hello",
+                    "data": {"posted": _posted_count, "total": _total_planned},
+                })
+            )
             while True:
-                kind, payload = self.log_queue.get_nowait()
-                if kind == "log":
-                    self._log(payload)
-                elif kind == "status":
-                    self._set_status(payload)
-                elif kind == "progress":
-                    cur, total = payload
-                    self._set_progress(cur, total)
-                elif kind == "done":
-                    rc, posted = payload
-                    self._on_done(rc, posted)
-        except queue.Empty:
+                try:
+                    payload = q.get(timeout=15)
+                    self._sse_write(payload)
+                except queue.Empty:
+                    # Keepalive ping. If the client is gone, the write
+                    # raises and we break out of the loop.
+                    if not self._sse_keepalive():
+                        break
+        except (BrokenPipeError, ConnectionResetError):
             pass
-        self.root.after(100, self._drain_log_queue)
+        finally:
+            with _state_lock:
+                try:
+                    _subscribers.remove(q)
+                except ValueError:
+                    pass
 
-    # ---------- ui helpers ----------
-    def _set_status(self, text: str) -> None:
-        self.status_var.set(text)
+    def _sse_write(self, payload: str) -> None:
+        self.wfile.write(b"data: " + payload.encode("utf-8") + b"\n\n")
+        self.wfile.flush()
 
-    def _set_progress(self, current: int, total: int) -> None:
-        self.progress_var.set(f"{current} of {total} posts")
-        if total > 0:
-            self.progress.config(maximum=total)
-            self.progress["value"] = current
-        else:
-            self.progress.config(maximum=1)
-            self.progress["value"] = 0
+    def _sse_keepalive(self) -> bool:
+        try:
+            self.wfile.write(b": keepalive\n\n")
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError):
+            return False
 
-    def _log(self, line: str) -> None:
-        ts = datetime.now().strftime("%H:%M:%S")
-        self.log_text.config(state=tk.NORMAL)
-        self.log_text.insert(tk.END, f"[{ts}] {line}\n")
-        self.log_text.see(tk.END)
-        self.log_text.config(state=tk.DISABLED)
+    # --- POST routing ---
+    def do_POST(self):
+        global _worker_thread, _process, _posted_count, _total_planned
+        global _stop_requested
+        parsed = urlparse(self.path)
+        path = parsed.path
 
-    def _on_done(self, rc: int, posted_count: int) -> None:
-        self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
-        if self.stop_requested:
-            self._set_status(f"Stopped. {posted_count} posted.")
-            messagebox.showinfo(
-                "Stopped",
-                f"Posting was stopped.\n{posted_count} video(s) posted.",
+        if path == "/config":
+            payload = self._read_json_body()
+            cfg = load_config()
+            if isinstance(payload.get("video_dir"), str):
+                cfg["video_dir"] = payload["video_dir"]
+            if isinstance(payload.get("queue_path"), str):
+                cfg["queue_path"] = payload["queue_path"]
+            save_config(cfg)
+            self._send_json(200, {"ok": True})
+            return
+
+        if path == "/start":
+            payload = self._read_json_body()
+            video_dir = payload.get("video_dir") or str(DEFAULT_VIDEO_DIR)
+            queue_path = payload.get("queue_path") or str(DEFAULT_QUEUE_PATH)
+
+            if _worker_thread and _worker_thread.is_alive():
+                self._send_json(409, {"ok": False, "error": "Already running"})
+                return
+            if not Path(queue_path).exists():
+                self._send_json(
+                    400, {"ok": False, "error": f"Queue not found: {queue_path}"}
+                )
+                return
+            if not Path(video_dir).exists():
+                self._send_json(
+                    400,
+                    {"ok": False, "error": f"Videos folder not found: {video_dir}"},
+                )
+                return
+            if not SCRIPT_PATH.exists():
+                self._send_json(
+                    500,
+                    {
+                        "ok": False,
+                        "error": f"tiktok_poster.py not found at {SCRIPT_PATH}",
+                    },
+                )
+                return
+
+            # Reset run state + persist picked paths.
+            _posted_count = 0
+            _total_planned = 0
+            _stop_requested = False
+            cfg = load_config()
+            cfg["video_dir"] = video_dir
+            cfg["queue_path"] = queue_path
+            save_config(cfg)
+
+            broadcast("status", "Launching tiktok_poster.py…")
+            broadcast("progress", {"current": 0, "total": 0})
+
+            _worker_thread = threading.Thread(
+                target=_worker, args=(video_dir, queue_path), daemon=True
             )
-        elif rc == 0:
-            self._set_status(f"Done. {posted_count} posted.")
-            messagebox.showinfo(
-                "Done",
-                f"✅ {posted_count} videos posted successfully",
-            )
-        else:
-            self._set_status(f"Subprocess exited with code {rc}.")
-            messagebox.showerror(
-                "Error",
-                f"Subprocess exited with code {rc}.\n{posted_count} video(s) posted before exit.",
-            )
+            _worker_thread.start()
+            self._send_json(200, {"ok": True})
+            return
+
+        if path == "/stop":
+            _stop_requested = True
+            if _process and _process.poll() is None:
+                try:
+                    _process.terminate()
+                except Exception:
+                    pass
+            broadcast("status", "Stop requested.")
+            self._send_json(200, {"ok": True})
+            return
+
+        self.send_error(404)
+
+
+class ThreadingServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
 
 
 def main() -> None:
-    root = tk.Tk()
-    PosterApp(root)
-    root.mainloop()
+    server = ThreadingServer(("127.0.0.1", PORT), Handler)
+    url = f"http://localhost:{PORT}"
+    print(f"🎀 Case Kisses Poster — {url}")
+    print("   Press Ctrl+C to quit.")
+
+    # Open the browser shortly after the server is actually ready.
+    def _open_browser():
+        time.sleep(0.4)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    threading.Thread(target=_open_browser, daemon=True).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down…")
+    finally:
+        # Terminate any active worker subprocess on exit.
+        if _process and _process.poll() is None:
+            try:
+                _process.terminate()
+            except Exception:
+                pass
+        server.shutdown()
+        server.server_close()
 
 
 if __name__ == "__main__":
