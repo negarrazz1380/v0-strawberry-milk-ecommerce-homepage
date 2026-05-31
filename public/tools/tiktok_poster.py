@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import sys
 import time
 from datetime import datetime
@@ -343,205 +344,176 @@ def dismiss_popups(driver) -> None:
             pass
 
 
-def _click_text_in_picker(driver, target_text: str) -> bool:
-    """Click the first visible element whose normalised text exactly equals
-    `target_text`. Used for the time picker (zero-padded HH and MM) and the
-    date picker's day cells — TikTok renders these as plain text leaves
-    inside list/grid containers, so an exact-text XPath is the surest hit."""
-    for el in driver.find_elements(
-        By.XPATH, f"//*[normalize-space(text())='{target_text}']"
-    ):
-        try:
-            if not el.is_displayed():
-                continue
-            driver.execute_script(
-                "arguments[0].scrollIntoView({block:'center'})", el
-            )
-            time.sleep(0.2)
-            driver.execute_script("arguments[0].click()", el)
-            return True
-        except Exception:
-            continue
-    return False
+def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
+    """Drive TikTok's date and time pickers, end to end.
 
+    Self-contained: opens each picker by locating the TUXTextInputCore
+    input whose value already matches the expected format (HH:MM /
+    YYYY-MM-DD), navigates the calendar forward by clicking the rightmost
+    narrow visible button (the '>' arrow), and clicks hour/minute leaves
+    inside the time picker via JS exact-text match.
 
-def _find_input_by_value(driver, predicate) -> Optional[object]:
-    """Return the first visible TikTok TUXTextInputCore input whose value
-    matches `predicate(value)`. Falls back to any <input> if the TUX class
-    isn't present (TikTok occasionally restyles)."""
-    selectors = ("input.TUXTextInputCore-input", "input")
-    seen = set()
-    for sel in selectors:
-        for inp in driver.find_elements(By.CSS_SELECTOR, sel):
-            ident = id(inp)
-            if ident in seen:
-                continue
-            seen.add(ident)
-            try:
-                if not inp.is_displayed():
-                    continue
-                val = (inp.get_attribute("value") or "").strip()
-                if predicate(val):
-                    return inp
-            except Exception:
-                continue
-    return None
+    Returns True if the inputs were located and driven; False if either
+    input was missing. Hour/minute and day clicks log their outcome but
+    don't fail the run — TikTok's selectors drift, so logging beats
+    raising.
+    """
+    target_date = datetime.strptime(date_str, "%Y-%m-%d")
+    target_year = target_date.year
+    target_month = target_date.month
+    target_day = target_date.day
 
+    time_parts = time_str.split(":")
+    target_hour = int(time_parts[0])
+    target_minute = int(time_parts[1])
+    # Round minute to nearest 5; cap so we never spill into the next hour.
+    target_minute = round(target_minute / 5) * 5
+    if target_minute == 60:
+        target_minute = 55
 
-_MONTH_NAME_TO_NUM = {
-    "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6,
-    "July": 7, "August": 8, "September": 9, "October": 10, "November": 11,
-    "December": 12,
-}
+    # ---------- STEP 1: open the calendar ----------
+    date_inputs = driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input")
+    date_input = None
+    for inp in date_inputs:
+        val = inp.get_attribute("value") or ""
+        if re.match(r"\d{4}-\d{2}-\d{2}", val):
+            date_input = inp
+            break
 
+    if not date_input:
+        print("   ERROR: Could not find date input")
+        return False
 
-def get_current_calendar_month(driver) -> str:
-    """Return the visible calendar header text, in TikTok's
-    'Month / YYYY' form (e.g. 'May / 2026'). Returns '' if not found.
+    driver.execute_script("arguments[0].click()", date_input)
+    time.sleep(2)
+    print("   Opened calendar")
 
-    Looks for near-leaf visible elements (≤2 children) whose entire
-    trimmed text matches the exact 'Month / YYYY' pattern — that filter
-    avoids the broader containers that also contain weekday labels."""
-    return driver.execute_script(
-        """
-        var els = document.querySelectorAll('*');
-        for (var i = 0; i < els.length; i++) {
-            var el = els[i];
-            if (el.children.length <= 2 && el.offsetParent !== null) {
-                var text = (el.textContent || '').trim();
-                if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s*\/\s*20\d{2}$/.test(text)) {
-                    return text;
-                }
-            }
-        }
-        return '';
-        """
-    )
+    # ---------- STEP 2: navigate to the target month ----------
+    month_names = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
 
-
-def click_next_month_arrow(driver) -> bool:
-    """Click the rightmost narrow visible svg/button — that's the '>'
-    arrow next to the calendar header. Position-based because the arrows
-    don't carry stable aria-labels or class names."""
-    return bool(
-        driver.execute_script(
-            """
-            var svg = document.querySelectorAll('svg, button');
-            var candidates = [];
-            for (var i = 0; i < svg.length; i++) {
-                var el = svg[i];
-                var rect = el.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0 && rect.width < 50) {
-                    candidates.push({el: el, x: rect.x});
-                }
-            }
-            candidates.sort(function (a, b) { return b.x - a.x; });
-            if (candidates.length > 0) {
-                candidates[0].el.click();
-                return true;
-            }
-            return false;
-            """
-        )
-    )
-
-
-def navigate_to_month(driver, target_year: int, target_month: int) -> bool:
-    """Step the calendar forward to (target_year, target_month).
-
-    Reads the header as 'Month / YYYY' each iteration, parses it, and
-    only clicks Next when the current month is strictly before target.
-    Returns True if the target was reached, False if we hit the cap, ran
-    past the target, or couldn't parse the header."""
     for _ in range(24):
-        header = get_current_calendar_month(driver)
-        print(f"   Calendar shows: {header}")
-
-        if header:
-            parts = [p.strip() for p in header.split("/")]
-            if len(parts) != 2 or parts[0] not in _MONTH_NAME_TO_NUM:
-                print(f"   ⚠️  Unexpected header format: {header!r}")
-                return False
-            current_month = _MONTH_NAME_TO_NUM[parts[0]]
+        # Visible narrow buttons — the > arrow is one of these.
+        visible_buttons = []
+        for btn in driver.find_elements(By.TAG_NAME, "button"):
             try:
-                current_year = int(parts[1])
-            except ValueError:
-                print(f"   ⚠️  Couldn't parse year from {header!r}")
-                return False
+                if btn.is_displayed() and btn.size["width"] < 60:
+                    visible_buttons.append(btn)
+            except Exception:
+                pass
 
-            if (current_year, current_month) == (target_year, target_month):
-                print(f"   Found correct month: {header}")
-                return True
-            if (current_year, current_month) > (target_year, target_month):
-                # The picker opened past the target — we only step forward.
-                print(f"   ⚠️  Calendar at {header}, past target")
-                return False
+        # Header text from any visible 'Month / YYYY' element.
+        current_month_text = ""
+        for el in driver.find_elements(By.XPATH, "//*"):
+            try:
+                if not el.is_displayed():
+                    continue
+                txt = (el.text or "").strip()
+                if re.match(
+                    r"^(January|February|March|April|May|June|July|August|"
+                    r"September|October|November|December)\s*/\s*\d{4}$",
+                    txt,
+                ):
+                    current_month_text = txt
+                    break
+            except Exception:
+                pass
 
-        if not click_next_month_arrow(driver):
-            print("   ⚠️  Couldn't find a next-month arrow")
-            return False
-        time.sleep(0.5)
+        print(f'   Calendar month: "{current_month_text}"')
 
-    print("   ⚠️  Hit 24-month nav cap without reaching target")
-    return False
+        if current_month_text:
+            parts = current_month_text.replace(" ", "").split("/")
+            curr_month_name = parts[0]
+            curr_year = int(parts[1])
+            curr_month = month_names.index(curr_month_name) + 1
 
+            if curr_year == target_year and curr_month == target_month:
+                print("   On correct month!")
+                break
 
-def click_calendar_day(driver, day_number: int) -> bool:
-    """Click the calendar cell whose text exactly equals `day_number`.
+            # Rightmost narrow button = next arrow.
+            if visible_buttons:
+                visible_buttons.sort(key=lambda b: b.location["x"], reverse=True)
+                try:
+                    driver.execute_script("arguments[0].click()", visible_buttons[0])
+                    print("   Clicked next arrow")
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"   Arrow click failed: {e}")
+        else:
+            # Couldn't read the header — best-effort: click rightmost narrow
+            # button anyway so we eventually get to a readable state.
+            if visible_buttons:
+                visible_buttons.sort(key=lambda b: b.location["x"], reverse=True)
+                try:
+                    driver.execute_script("arguments[0].click()", visible_buttons[0])
+                    time.sleep(0.5)
+                except Exception:
+                    pass
 
-    XPath alone was unreliable here because TikTok's day cell often wraps
-    the visible number alongside aria-labels or screenreader-only helper
-    text, so `normalize-space(text())='30'` either matched a wrong sibling
-    or skipped the cell. Running the lookup in JS lets us combine: real
-    visibility (`offsetParent`), exact `textContent` match, a calendar-
-    grid context (td / gridcell / Day*/Cell*), and an exclusion list for
-    grayed-out adjacent-month cells — all in one pass."""
-    day_str = str(int(day_number))
-    result = driver.execute_script(
-        """
-        var day = arguments[0];
-        var candidates = document.querySelectorAll(
-            'td, [role="gridcell"], [role="button"], '
-            + '[class*="Day"], [class*="day"], [class*="Cell"], [class*="cell"]'
-        );
-        for (var i = 0; i < candidates.length; i++) {
-            var el = candidates[i];
-            if (!el.offsetParent) continue;
-            var text = (el.textContent || '').trim();
-            if (text !== day) continue;
-            var classes = (el.className || '').toString();
-            if (classes.includes('disabled') || classes.includes('gray')
-                || classes.includes('outside') || classes.includes('prev')
-                || classes.includes('next')) continue;
-            el.click();
-            return 'clicked ' + text;
-        }
-        return 'not found';
-        """,
-        day_str,
-    )
-    print(f"   Day click result: {result}")
-    return "clicked" in str(result)
+    # ---------- STEP 3: click the day ----------
+    time.sleep(0.5)
+    day_str = str(target_day)
 
+    day_clicked = False
+    for xpath in (
+        f'//td[normalize-space(.)="{day_str}" and not(contains(@class,"disabled")) '
+        f'and not(contains(@class,"gray")) and not(contains(@class,"outside"))]',
+        f'//td[normalize-space(.)="{day_str}"]',
+        f'//div[normalize-space(.)="{day_str}" and contains(@class,"Day")]',
+        f'//span[normalize-space(.)="{day_str}"]',
+    ):
+        for el in driver.find_elements(By.XPATH, xpath):
+            try:
+                if el.is_displayed():
+                    driver.execute_script("arguments[0].click()", el)
+                    print(f"   Clicked day {day_str}")
+                    day_clicked = True
+                    break
+            except Exception:
+                pass
+        if day_clicked:
+            break
 
-def scroll_time_picker_columns_to_top(driver) -> None:
-    """Scroll any narrow scrollable picker column to its top.
+    if not day_clicked:
+        print(f"   WARNING: Could not click day {day_str}")
 
-    The hour column opens centered on the current hour (TikTok shows
-    ~16-22 by default), so early hours like '07' aren't even rendered
-    until we rewind the column. Tight heuristics so we don't accidentally
-    rewind the page itself or some side rail: real overflow with a 10px
-    buffer, visible, narrow (0 < width < 80), and tall enough (> 50)."""
+    time.sleep(1)
+    # Close the calendar with Escape — body-click was swallowed by some builds.
+    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+    time.sleep(0.5)
+
+    # ---------- STEP 4: open the time picker ----------
+    time_inputs = driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input")
+    time_input = None
+    for inp in time_inputs:
+        val = inp.get_attribute("value") or ""
+        if re.match(r"\d{2}:\d{2}", val):
+            time_input = inp
+            break
+
+    if not time_input:
+        print("   ERROR: Could not find time input")
+        return False
+
+    driver.execute_script("arguments[0].click()", time_input)
+    time.sleep(2)
+    print("   Opened time picker")
+
+    # ---------- STEP 5: scroll columns then click hour + minute ----------
+    # Rewind every narrow scrollable column to the top so early hours
+    # (e.g. 07) are in the DOM by the time we look for them.
     driver.execute_script(
         """
         var all = document.querySelectorAll('*');
         for (var i = 0; i < all.length; i++) {
             var el = all[i];
             var rect = el.getBoundingClientRect();
-            if (el.scrollHeight > el.clientHeight + 10
-                && rect.width > 0 && rect.width < 80
-                && rect.height > 50
-                && el.offsetParent !== null) {
+            if (el.scrollHeight > el.clientHeight + 5
+                && rect.width > 0 && rect.width < 100
+                && rect.height > 80 && el.offsetParent !== null) {
                 el.scrollTop = 0;
             }
         }
@@ -549,134 +521,68 @@ def scroll_time_picker_columns_to_top(driver) -> None:
     )
     time.sleep(0.5)
 
-
-def _click_picker_value_js(driver, value: str) -> bool:
-    """JS fallback for the time picker: find any visible element whose
-    trimmed `textContent` exactly equals `value` and click it. Tried after
-    `_click_text_in_picker` misses — the XPath form requires a text leaf,
-    while this form clicks whatever wrapper actually matches."""
-    return bool(
-        driver.execute_script(
-            """
-            var v = arguments[0];
-            var all = document.querySelectorAll('*');
-            for (var i = 0; i < all.length; i++) {
-                var el = all[i];
-                if (!el.offsetParent) continue;
-                if ((el.textContent || '').trim() !== v) continue;
+    # Hour: leaf elements with exact text, small footprint (column cell).
+    hour_str = f"{target_hour:02d}"
+    hour_clicked = driver.execute_script(
+        """
+        var target = arguments[0];
+        var all = document.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.offsetParent === null) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== target) continue;
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 80 && rect.height < 50) {
+                el.scrollIntoView({block: 'center'});
                 el.click();
-                return true;
+                return 'clicked ' + target;
             }
-            return false;
-            """,
-            str(value),
-        )
+        }
+        return 'not found';
+        """,
+        hour_str,
     )
+    print(f"   Hour result: {hour_clicked}")
+    time.sleep(0.5)
 
+    # Minute: same leaf-cell pattern.
+    min_str = f"{target_minute:02d}"
+    min_clicked = driver.execute_script(
+        """
+        var target = arguments[0];
+        var all = document.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.offsetParent === null) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== target) continue;
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 80 && rect.height < 50) {
+                el.scrollIntoView({block: 'center'});
+                el.click();
+                return 'clicked ' + target;
+            }
+        }
+        return 'not found';
+        """,
+        min_str,
+    )
+    print(f"   Minute result: {min_clicked}")
+    time.sleep(0.5)
 
-def set_schedule_datetime(driver, date_str: str, time_str: str) -> None:
-    """Drive TikTok's custom date and time pickers in one shot.
+    # Close time picker.
+    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+    time.sleep(1)
 
-    Date FIRST so the time picker doesn't get reset when the day flips —
-    TikTok rebuilds the time column whenever the selected date changes.
+    # Sanity-check: log the current values so the operator can see what
+    # the inputs actually contain after we drove them.
+    for inp in driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input"):
+        val = inp.get_attribute("value") or ""
+        if val:
+            print(f"   Input value: {val}")
 
-    Date: open the YYYY-MM-DD input, navigate the calendar forward to the
-    target month via `navigate_to_month`, then click the day cell. Cells
-    in the previous/next month carry classes like `disabled`, `gray`, or
-    `other-month`, so the primary XPath rejects those — the fallback
-    XPaths still match if TikTok ships unclassified cells.
-
-    Time: open the HH:MM input, click the zero-padded hour cell, then the
-    minute cell rounded to the nearest 5 (00, 05, … 55).
-
-    Both pickers are plain text in nested divs, not real <input>s — that's
-    why we exact-match text via XPath and click via JS instead of typing
-    or sending keys.
-    """
-    # ---------- DATE (first — time picker resets when the day changes) ----------
-    if date_str:
-        target = datetime.strptime(date_str, "%Y-%m-%d")
-        target_day_str = str(target.day)
-        print(
-            f"Setting date to {date_str} "
-            f"({target.strftime('%B %Y')}, day {target_day_str})..."
-        )
-        date_input = _find_input_by_value(
-            driver,
-            lambda v: (
-                len(v) == 10 and v[4] == "-" and v[7] == "-"
-                and v[:4].isdigit() and v[5:7].isdigit() and v[8:].isdigit()
-            ),
-        )
-        if date_input is None:
-            print("   ⚠️  Couldn't find a YYYY-MM-DD input to open")
-        else:
-            driver.execute_script("arguments[0].click()", date_input)
-            time.sleep(1.5)
-
-            navigate_to_month(driver, target.year, target.month)
-
-            if not click_calendar_day(driver, target.day):
-                print(f"   ⚠️  Couldn't click day {target_day_str}")
-
-            # Wait for the click to register, then press Escape — the
-            # calendar swallows outside-clicks in some builds, so Escape
-            # is the cleanest way to dismiss it before opening the time
-            # picker.
-            time.sleep(1)
-            try:
-                ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-            except Exception:
-                pass
-            time.sleep(0.5)
-
-    # ---------- TIME ----------
-    if time_str:
-        hh, _, mm = time_str.partition(":")
-        try:
-            target_hour = int(hh)
-        except ValueError:
-            target_hour = 0
-        try:
-            target_minute = int(mm)
-        except ValueError:
-            target_minute = 0
-        target_minute = min(round(target_minute / 5) * 5, 55)
-        hour_str = f"{target_hour:02d}"
-        minute_str = f"{target_minute:02d}"
-
-        print(f"Setting time to {hour_str}:{minute_str}...")
-        time_input = _find_input_by_value(
-            driver,
-            lambda v: (
-                len(v) == 5 and v[2] == ":"
-                and v[:2].isdigit() and v[3:].isdigit()
-            ),
-        )
-        if time_input is None:
-            print("   ⚠️  Couldn't find a HH:MM input to open")
-            return
-        driver.execute_script("arguments[0].click()", time_input)
-        time.sleep(1.5)
-        # Early hours (e.g. 07) sit at the top of the hour column. If the
-        # column opened scrolled past them they're not in the DOM yet —
-        # rewind both columns to the top before clicking.
-        scroll_time_picker_columns_to_top(driver)
-        if _click_text_in_picker(driver, hour_str) or _click_picker_value_js(driver, hour_str):
-            print(f"   Clicked hour {hour_str}")
-        else:
-            print(f"   ⚠️  Couldn't click hour {hour_str}")
-        time.sleep(0.5)
-        if _click_text_in_picker(driver, minute_str) or _click_picker_value_js(driver, minute_str):
-            print(f"   Clicked minute {minute_str}")
-        else:
-            print(f"   ⚠️  Couldn't click minute {minute_str}")
-        # Close the time picker.
-        try:
-            driver.find_element(By.TAG_NAME, "body").click()
-        except Exception:
-            pass
-        time.sleep(0.5)
+    return True
 
 
 def choose_schedule(driver, date_str: str = "", time_str: str = "") -> None:
