@@ -1403,7 +1403,7 @@
     { archetype: "ASMR Unboxing",                   patterns: ["asmr", "unbox"] },
     { archetype: "Outfit Swap Transition",          patterns: ["outfitswap", "swap"] },
     { archetype: "POV Outfit Match",                patterns: ["outfitmatch", "outfit", "pov"] },
-    { archetype: "Before/After Ugly Case",          patterns: ["beforeafter", "ugly", "before"] },
+    { archetype: "Before/After Ugly Case",          patterns: ["beforeafter", "ugly", "before", "glowup"] },
     { archetype: "Girl Math Comedy",                patterns: ["girlmath", "girl_math"] },
     { archetype: "Which One Matches Your Vibe",     patterns: ["whichone", "vibe"] },
     { archetype: "Rate My Phone Setup",             patterns: ["desksetup", "desk", "setup"] },
@@ -1413,17 +1413,17 @@
     { archetype: "Small Business BTS",              patterns: ["bts", "behind", "packing"] },
     { archetype: "Fruit Case Trend",                patterns: ["fruittrend", "fruit"] },
     { archetype: "My Boyfriend Hates It",           patterns: ["boyfriend"] },
-    { archetype: "IT Girl Phone Check",             patterns: ["itgirl", "it_girl"] },
+    { archetype: "IT Girl Phone Check",             patterns: ["itgirl", "it_girl", "editorial"] },
     { archetype: "Canadian Small Business",         patterns: ["canadian"] },
     { archetype: "Compliment Magnet",               patterns: ["compliment"] },
     { archetype: "Nostalgia Hit",                   patterns: ["nostalgia"] },
-    { archetype: "Hand Covers Camera Transition",   patterns: ["handtransition", "handcover"] },
+    { archetype: "Hand Covers Camera Transition",   patterns: ["handtransition", "handcover", "hand"] },
     { archetype: "Falling Phone Transition",        patterns: ["fallingphone", "falling", "drop"] },
     { archetype: "PR Package Haul",                 patterns: ["prhaul", "pr_haul"] },
     { archetype: "Influencer Ranking Haul",         patterns: ["ranking"] },
     { archetype: "Honest Review 2 Weeks",           patterns: ["honestrev", "honest", "review"] },
     { archetype: "Should Be Illegal Hook",          patterns: ["illegal"] },
-    { archetype: "Founder Story",                   patterns: ["founder"] },
+    { archetype: "Founder Story",                   patterns: ["founder", "brandintro"] },
     { archetype: "Didn't Know This Existed",        patterns: ["didntknow", "didnt"] }
   ];
 
@@ -1448,151 +1448,237 @@
     return null;
   }
 
-  function autoMatchVideos(files) {
-    if (!files || !files.length) return;
-    var lines = [];
-    var filesMatched = 0;
-    var slotsConfirmed = 0;
-
-    for (var f = 0; f < files.length; f++) {
-      var file = files[f];
-      var name = file.name;
-      var product = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
-      var archetype = applyFilenameRules(name, FILENAME_CONCEPT_RULES, "archetype");
-
-      if (!product || !archetype) {
-        lines.push("❌ " + name + " — couldn't infer " +
-          (!product && !archetype ? "case or concept" :
-           !product ? "case" : "concept"));
-        continue;
-      }
-
-      // One file can match multiple slots — the same (case, concept) combo may
-      // repeat across weeks. Each match flips its slot to confirmed and stamps
-      // the filename onto videoFilePath.
-      var hits = 0;
-      Object.keys(data).forEach(function (key) {
-        var e = data[key];
-        if (!e) return;
-        if (e.product === product && e.archetype === archetype) {
-          e.videoFilePath = name;
-          e.status = "confirmed";
-          hits++;
+  // Returns every archetype the filename "suggests" — order matters in the
+  // rule list (specific first) so the FIRST hit is treated as the primary
+  // signal. Used to score candidate cards.
+  function detectFilenameConcepts(filename) {
+    var n = String(filename || "").toLowerCase();
+    var seen = {};
+    var primary = null;
+    for (var i = 0; i < FILENAME_CONCEPT_RULES.length; i++) {
+      var rule = FILENAME_CONCEPT_RULES[i];
+      if (rule.exclude) {
+        var excluded = false;
+        for (var k = 0; k < rule.exclude.length; k++) {
+          if (n.indexOf(rule.exclude[k]) !== -1) { excluded = true; break; }
         }
-      });
-
-      filesMatched++;
-      slotsConfirmed += hits;
-      lines.push("✓ " + name + " → " + product + " + " + archetype +
-        " (" + hits + " slot" + (hits === 1 ? "" : "s") + ")");
+        if (excluded) continue;
+      }
+      var hit = false;
+      for (var j = 0; j < rule.patterns.length; j++) {
+        if (n.indexOf(rule.patterns[j]) !== -1) { hit = true; break; }
+      }
+      if (hit) {
+        seen[rule.archetype] = true;
+        if (!primary) primary = rule.archetype;
+      }
     }
-
-    saveData();
-    renderCalendar();
-
-    var summary =
-      "✅ Matched " + filesMatched + " of " + files.length + " files.\n" +
-      slotsConfirmed + " calendar slot" + (slotsConfirmed === 1 ? "" : "s") +
-      " confirmed automatically.\n\n" + lines.join("\n");
-    alert(summary);
-    showToast("Auto-matched " + slotsConfirmed + " slot" + (slotsConfirmed === 1 ? "" : "s") + " 🎬");
+    return { primary: primary, signals: Object.keys(seen) };
   }
 
-  // ---------- posting round ----------
-  // Strict status machine: planned → confirmed → posted.
-  // A posting round only ever touches `planned` cards, and only flips them
-  // to `confirmed` when a matching video file shows up. `posted` cards are
-  // walled off and never re-enter the round.
-  function startPostingRound(files) {
-    if (!files || !files.length) return;
-
-    // Build (case+archetype) → file lookup from the user's picks. Last file
-    // wins on duplicate combos.
-    var fileByCombo = {};
-    var unmatchedFiles = [];
-    for (var f = 0; f < files.length; f++) {
-      var name = files[f].name;
-      var product = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
-      var archetype = applyFilenameRules(name, FILENAME_CONCEPT_RULES, "archetype");
-      if (product && archetype) {
-        fileByCombo[product + "||" + archetype] = name;
-      } else {
-        unmatchedFiles.push({
-          name: name,
-          reason: !product && !archetype ? "no case or concept" :
-                  !product ? "no case" : "no concept"
-        });
-      }
-    }
-
-    var confirmed = [];    // newly flipped planned → confirmed this round
-    var stillPlanned = []; // planned + no matching file
-    var skippedPosted = 0; // cards already past the line
-
-    Object.keys(data).forEach(function (key) {
-      var e = data[key];
-      if (!e) return;
-      if (e.status === "posted") { skippedPosted++; return; }
-      if (e.status !== "planned") return; // confirmed cards left alone here
-      var combo = e.product + "||" + e.archetype;
-      var file = fileByCombo[combo];
-      if (file) {
-        e.status = "confirmed";
-        e.videoFilePath = file;
-        confirmed.push({ key: key, entry: e });
-      } else {
-        stillPlanned.push({ key: key, entry: e });
-      }
+  // Plan assignments without mutating `data`. Strategy:
+  //   1. Resolve the file's case via FILENAME_CASE_RULES. No case → unmatched.
+  //   2. Build the candidate pool: cards where status === "planned" AND
+  //      videoFilePath is empty AND product === detected case. Already-
+  //      confirmed and posted cards are excluded — case-locked, never
+  //      overwritten.
+  //   3. Score each candidate: 2 if its archetype equals the file's primary
+  //      detected concept, 1 if it matches any of the file's other concept
+  //      signals, 0 otherwise. Highest wins; ties broken by earliest slot key.
+  //   4. Remove the chosen card from the pool so the next file picks a
+  //      different one (one file → one card per round).
+  function computeAutoMatchPlan(files) {
+    var openByCase = {};
+    Object.keys(data).forEach(function (k) {
+      var e = data[k];
+      if (!e || e.status !== "planned") return;
+      if (e.videoFilePath) return;
+      if (!openByCase[e.product]) openByCase[e.product] = [];
+      openByCase[e.product].push({ key: k, entry: e });
+    });
+    Object.keys(openByCase).forEach(function (c) {
+      openByCase[c].sort(function (a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
     });
 
+    var assignments = [];
+    var unmatched = [];
+
+    for (var i = 0; i < files.length; i++) {
+      var name = files[i].name;
+      var caseName = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
+      if (!caseName) {
+        unmatched.push({ file: name, reason: "couldn't detect case" });
+        continue;
+      }
+      var candidates = openByCase[caseName] || [];
+      if (candidates.length === 0) {
+        unmatched.push({ file: name, reason: "no open " + caseName + " slots" });
+        continue;
+      }
+      var concept = detectFilenameConcepts(name);
+      var bestIdx = 0, bestScore = -1;
+      for (var j = 0; j < candidates.length; j++) {
+        var arch = candidates[j].entry.archetype;
+        var score = 0;
+        if (concept.primary === arch) score = 2;
+        else if (concept.signals.indexOf(arch) !== -1) score = 1;
+        if (score > bestScore) { bestScore = score; bestIdx = j; }
+      }
+      var chosen = candidates.splice(bestIdx, 1)[0];
+      assignments.push({
+        file: name,
+        key: chosen.key,
+        product: caseName,
+        archetype: chosen.entry.archetype,
+        primary: concept.primary,
+        score: bestScore
+      });
+    }
+
+    return { assignments: assignments, unmatched: unmatched };
+  }
+
+  function applyAutoMatchPlan(plan) {
+    plan.assignments.forEach(function (a) {
+      var e = data[a.key];
+      if (!e) return;
+      e.videoFilePath = a.file;
+      e.status = "confirmed";
+    });
     saveData();
     renderCalendar();
+  }
 
-    // Build summary modal body.
+  // Renders a preview into the round overlay and pre-arms `pendingRoundAction`
+  // with the callback to run when the user clicks Continue. The same modal
+  // serves auto-match and posting-round flows; only the title and callback
+  // differ. `extras` may include { stillPlanned, skippedPosted, continueLabel }.
+  function showAutoMatchPreview(plan, files, title, continueLabel, onConfirm, extras) {
+    extras = extras || {};
     var html = '<p style="margin: 0 0 10px 0;">' +
-      '<strong>✅ ' + confirmed.length + '</strong> card' + (confirmed.length === 1 ? "" : "s") + ' confirmed (videos matched)<br>' +
-      '<strong>⚠️ ' + stillPlanned.length + '</strong> card' + (stillPlanned.length === 1 ? "" : "s") + ' still need videos<br>' +
-      '<strong>⏭️ ' + skippedPosted + '</strong> card' + (skippedPosted === 1 ? "" : "s") + ' already posted (skipped)' +
-      "</p>";
+      '<strong>✅ ' + plan.assignments.length + '</strong> file' +
+      (plan.assignments.length === 1 ? "" : "s") + ' will be matched to slots<br>' +
+      '<strong>⚠️ ' + plan.unmatched.length + '</strong> file' +
+      (plan.unmatched.length === 1 ? "" : "s") + " couldn't be matched";
+    if (typeof extras.skippedPosted === "number") {
+      html += '<br><strong>⏭️ ' + extras.skippedPosted + '</strong> card' +
+        (extras.skippedPosted === 1 ? "" : "s") + ' already posted (skipped)';
+    }
+    html += "</p>";
 
-    if (stillPlanned.length) {
-      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">Still need videos:</h3>';
+    if (plan.assignments.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">Will assign:</h3>';
       html += '<ul style="margin: 0; padding-left: 18px;">';
-      stillPlanned.forEach(function (s) {
+      plan.assignments.forEach(function (a) {
+        var hint = a.score === 2 ? " 🎯" :
+                   a.score === 1 ? " (concept partial match)" :
+                                   " (earliest slot, no concept match)";
+        html += "<li>" + esc(a.file) + " → " + esc(humanContext(a.key)) + " — " +
+          esc(a.product) + " + " + esc(a.archetype) + hint + "</li>";
+      });
+      html += "</ul>";
+    }
+
+    if (plan.unmatched.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b91c1c;">Files I couldn\'t place:</h3>';
+      html += '<ul style="margin: 0; padding-left: 18px;">';
+      plan.unmatched.forEach(function (u) {
+        html += "<li>" + esc(u.file) + " (" + esc(u.reason) + ")</li>";
+      });
+      html += "</ul>";
+    }
+
+    if (extras.stillPlanned && extras.stillPlanned.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">Cards that will still need videos:</h3>';
+      html += '<ul style="margin: 0; padding-left: 18px;">';
+      extras.stillPlanned.forEach(function (s) {
         html += "<li>" + esc(humanContext(s.key)) + " — " +
           esc(s.entry.product) + " + " + esc(s.entry.archetype) + "</li>";
       });
       html += "</ul>";
     }
 
-    if (unmatchedFiles.length) {
-      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b91c1c;">Files I couldn\'t parse:</h3>';
-      html += '<ul style="margin: 0; padding-left: 18px;">';
-      unmatchedFiles.forEach(function (u) {
-        html += "<li>" + esc(u.name) + " (" + esc(u.reason) + ")</li>";
-      });
-      html += "</ul>";
-    }
-
-    if (confirmed.length) {
+    if (extras.footerNote) {
       html += '<p style="margin: 14px 0 0 0; font-size: 12px; color: var(--muted);">' +
-        "Click Continue to download <code>posting-queue.json</code> for tiktok_poster.py." +
-        "</p>";
+        extras.footerNote + "</p>";
     }
 
-    document.getElementById("roundTitle").textContent = "Posting round summary";
+    document.getElementById("roundTitle").textContent = title;
     document.getElementById("roundCtx").textContent =
       "Reviewed " + files.length + " uploaded video" + (files.length === 1 ? "" : "s");
     document.getElementById("roundBody").innerHTML = html;
-    // Continue exports + closes; Close just dismisses without exporting.
     var continueBtn = document.getElementById("roundContinue");
-    continueBtn.style.display = confirmed.length ? "" : "none";
-    continueBtn.textContent = "Continue & Export Queue";
-    pendingRoundExport = confirmed.length > 0;
+    continueBtn.style.display = plan.assignments.length ? "" : "none";
+    continueBtn.textContent = continueLabel;
+    pendingRoundAction = onConfirm;
     openOverlay("roundOverlay");
   }
 
-  var pendingRoundExport = false;
+  // Build the "after applying" list of planned cards that still have no
+  // video. Used for the posting-round preview's footer.
+  function plannedRemainingAfter(plan) {
+    var claimed = {};
+    plan.assignments.forEach(function (a) { claimed[a.key] = true; });
+    var still = [];
+    Object.keys(data).forEach(function (k) {
+      var e = data[k];
+      if (!e || e.status !== "planned") return;
+      if (e.videoFilePath) return;
+      if (claimed[k]) return;
+      still.push({ key: k, entry: e });
+    });
+    still.sort(function (a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
+    return still;
+  }
+
+  function countPostedCards() {
+    var n = 0;
+    Object.keys(data).forEach(function (k) {
+      if (data[k] && data[k].status === "posted") n++;
+    });
+    return n;
+  }
+
+  function autoMatchVideos(files) {
+    if (!files || !files.length) return;
+    var plan = computeAutoMatchPlan(files);
+    showAutoMatchPreview(
+      plan, files, "Auto-match preview", "Confirm & Apply",
+      function () {
+        applyAutoMatchPlan(plan);
+        showToast("Auto-matched " + plan.assignments.length + " slot" +
+          (plan.assignments.length === 1 ? "" : "s") + " 🎬");
+      },
+      {}
+    );
+  }
+
+  // ---------- posting round ----------
+  // Strict status machine: planned → confirmed → posted.
+  // A posting round only ever touches `planned` cards. `posted` cards are
+  // walled off and never re-enter the round.
+  function startPostingRound(files) {
+    if (!files || !files.length) return;
+    var plan = computeAutoMatchPlan(files);
+    var stillPlanned = plannedRemainingAfter(plan);
+    var skippedPosted = countPostedCards();
+    showAutoMatchPreview(
+      plan, files, "Posting round preview", "Continue & Export Queue",
+      function () {
+        applyAutoMatchPlan(plan);
+        exportForPosting();
+      },
+      {
+        stillPlanned: stillPlanned,
+        skippedPosted: skippedPosted,
+        footerNote: plan.assignments.length
+          ? "Click Continue to download <code>posting-queue.json</code> for tiktok_poster.py."
+          : ""
+      }
+    );
+  }
+
+  var pendingRoundAction = null;
 
   // ---------- sync posted status ----------
   // Reads a round-complete.json the Python poster wrote, finds matching
@@ -1710,14 +1796,13 @@
 
   document.getElementById("roundContinue").addEventListener("click", function () {
     closeOverlay("roundOverlay");
-    if (pendingRoundExport) {
-      pendingRoundExport = false;
-      exportForPosting();
-    }
+    var action = pendingRoundAction;
+    pendingRoundAction = null;
+    if (action) action();
   });
   document.getElementById("roundClose").addEventListener("click", function () {
     closeOverlay("roundOverlay");
-    pendingRoundExport = false;
+    pendingRoundAction = null;
   });
 
   document.getElementById("shootListCopyAll").addEventListener("click", function () {
