@@ -403,15 +403,56 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December",
     ]
+    # Header reader. The earlier exact-match regex failed because
+    # `textContent` bubbles up text from every descendant, so a parent
+    # whose direct text is "May / 2026" never matches once it also
+    # contains the weekday row + day grid. Two-pass approach:
+    #   1. Find a sized header-shaped element (visible, 20+ wide,
+    #      10-50 tall) and read ONLY its direct text nodes (nodeType=3).
+    #      Match if that text contains a month name AND a 20XX year.
+    #   2. Fallback: any short visible text (< 25 chars) containing a
+    #      month + a 20XX year, for builds that put the header inside
+    #      a leaf <span>.
     header_read_js = r"""
+        var months = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
         var all = document.querySelectorAll('*');
         for (var i = 0; i < all.length; i++) {
             var el = all[i];
             if (!el.offsetParent) continue;
-            if (el.children.length > 2) continue;
-            var t = el.textContent.trim();
-            if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s*\/\s*\d{4}$/.test(t)) {
-                return t;
+            var rect = el.getBoundingClientRect();
+            if (rect.width < 20 || rect.height < 10 || rect.height > 50) continue;
+
+            // Direct text only: skip descendants' text.
+            var directText = '';
+            for (var j = 0; j < el.childNodes.length; j++) {
+                if (el.childNodes[j].nodeType === 3) {
+                    directText += el.childNodes[j].textContent;
+                }
+            }
+            directText = directText.trim();
+            if (el.children.length === 0) {
+                directText = el.textContent.trim();
+            }
+            if (!directText) continue;
+
+            for (var m = 0; m < months.length; m++) {
+                if (directText.indexOf(months[m]) >= 0 && /20\d{2}/.test(directText)) {
+                    return directText;
+                }
+            }
+        }
+
+        // Fallback: any short visible text with month + year.
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            var text = el.textContent.trim();
+            if (text.length > 30) continue;
+            for (var m = 0; m < months.length; m++) {
+                if (text.indexOf(months[m]) >= 0 && /20\d{2}/.test(text) && text.length < 25) {
+                    return text;
+                }
             }
         }
         return '';
@@ -460,9 +501,23 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
             time.sleep(0.5)
             continue
 
-        parts = header_text.replace(" ", "").split("/")
-        curr_month = month_names.index(parts[0]) + 1
-        curr_year = int(parts[1])
+        # Extract month + year by substring / regex rather than splitting on
+        # '/', so "May / 2026", "May/2026", and "May 2026" all parse.
+        curr_month = None
+        for mn in month_names:
+            if mn in header_text:
+                curr_month = month_names.index(mn) + 1
+                break
+        year_match = re.search(r"20\d{2}", header_text)
+        curr_year = int(year_match.group()) if year_match else None
+
+        if curr_month is None or curr_year is None:
+            # Found a header-shaped string but couldn't parse it — nudge
+            # forward and retry on the next iteration.
+            driver.execute_script(click_right_js)
+            print(f"   Couldn't parse {header_text!r}; clicked > forward")
+            time.sleep(0.5)
+            continue
 
         if (curr_year, curr_month) == (target_year, target_month):
             print("   On correct month!")
@@ -523,25 +578,11 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
     time.sleep(2)
     print("   Opened time picker")
 
-    # ---------- STEP 5: scroll columns then click hour + minute ----------
-    # Rewind every narrow scrollable column to the top so early hours
-    # (e.g. 07) are in the DOM by the time we look for them.
-    driver.execute_script(
-        """
-        var all = document.querySelectorAll('*');
-        for (var i = 0; i < all.length; i++) {
-            var el = all[i];
-            var rect = el.getBoundingClientRect();
-            if (el.scrollHeight > el.clientHeight + 5
-                && rect.width > 0 && rect.width < 100
-                && rect.height > 80 && el.offsetParent !== null) {
-                el.scrollTop = 0;
-            }
-        }
-        """
-    )
-    time.sleep(0.5)
-
+    # ---------- STEP 5: click hour + minute ----------
+    # No bulk scrollTop=0 here — resetting whole columns scrolled the
+    # selection out from under the click. Each hour/minute click uses
+    # `scrollIntoView({block:'center'})` to bring its own target into the
+    # viewport without disturbing the rest of the page.
     # Hour: leaf elements with exact text, small footprint (column cell).
     hour_str = f"{target_hour:02d}"
     hour_clicked = driver.execute_script(
