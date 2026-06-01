@@ -531,19 +531,30 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
         time.sleep(0.5)
 
     # ---------- STEP 5: click the target day ----------
+    # Find the INNERMOST leaf element whose entire text is the day number
+    # (no children, exact match). The <td> wrapper is often big and gets
+    # `pointer-events: none` via overlapping siblings, so React only
+    # registers the click when it lands on the inner cell. Dispatch
+    # mousedown + mouseup + click so React's synthetic event system sees
+    # a real pointer interaction — `el.click()` alone fires only the
+    # `click` half and React commonly ignores it.
     day_str = str(target_day)
     day_clicked = driver.execute_script(
         """
-        var target = arguments[0];
-        var cells = document.querySelectorAll('td, [role="gridcell"]');
-        for (var i = 0; i < cells.length; i++) {
-            var cell = cells[i];
-            if (!cell.offsetParent) continue;
-            var text = cell.textContent.trim();
-            if (text === target) {
-                var cls = cell.className || '';
-                if (cls.indexOf('disabled') >= 0 || cls.indexOf('gray') >= 0 || cls.indexOf('outside') >= 0) continue;
-                cell.click();
+        var d = arguments[0];
+        var all = document.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== d) continue;
+            var r = el.getBoundingClientRect();
+            if (r.width > 15 && r.width < 55 && r.height > 15 && r.height < 55) {
+                var cls = (el.className || '') + (el.parentElement ? el.parentElement.className : '');
+                if (cls.indexOf('disabled') >= 0 || cls.indexOf('outside') >= 0) continue;
+                el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,view:window}));
                 return true;
             }
         }
@@ -597,7 +608,9 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
             var rect = el.getBoundingClientRect();
             if (rect.width < 80 && rect.height < 50) {
                 el.scrollIntoView({block: 'center'});
-                el.click();
+                el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,view:window}));
                 return 'clicked ' + target;
             }
         }
@@ -606,9 +619,11 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
         hour_str,
     )
     print(f"   Hour result: {hour_clicked}")
-    time.sleep(0.5)
+    # Give React a beat to commit the hour selection before we go hunting
+    # for the minute — the minute column rebuilds on hour change.
+    time.sleep(1)
 
-    # Minute: same leaf-cell pattern.
+    # Minute: same leaf-cell pattern + same three-event dispatch.
     min_str = f"{target_minute:02d}"
     min_clicked = driver.execute_script(
         """
@@ -622,7 +637,9 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
             var rect = el.getBoundingClientRect();
             if (rect.width < 80 && rect.height < 50) {
                 el.scrollIntoView({block: 'center'});
-                el.click();
+                el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,cancelable:true,view:window}));
+                el.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,view:window}));
                 return 'clicked ' + target;
             }
         }
