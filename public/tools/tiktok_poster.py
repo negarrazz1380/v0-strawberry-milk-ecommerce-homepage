@@ -393,100 +393,116 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
     time.sleep(2)
     print("   Opened calendar")
 
-    # ---------- STEP 2: navigate to the target month ----------
+    # ---------- STEP 2-3: navigate header to (target_year, target_month) ----------
+    # The header reads as "Month / YYYY" inside a near-leaf element (≤2
+    # children). Each iteration we re-read it, compare to target, then
+    # click forward or backward exactly once depending on which side of
+    # target we're on. No scroll-into-view, no React state, just header
+    # read + arrow click.
     month_names = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December",
     ]
+    header_read_js = r"""
+        var all = document.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            if (el.children.length > 2) continue;
+            var t = el.textContent.trim();
+            if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s*\/\s*\d{4}$/.test(t)) {
+                return t;
+            }
+        }
+        return '';
+    """
+    # Rightmost narrow visible button near the header = forward arrow.
+    click_right_js = """
+        var buttons = document.querySelectorAll('button');
+        var rightmost = null;
+        var maxX = -1;
+        for (var i = 0; i < buttons.length; i++) {
+            var b = buttons[i];
+            if (!b.offsetParent) continue;
+            var r = b.getBoundingClientRect();
+            if (r.width > 5 && r.width < 50 && r.height > 5 && r.height < 50 && r.x > maxX) {
+                maxX = r.x;
+                rightmost = b;
+            }
+        }
+        if (rightmost) rightmost.click();
+    """
+    # Leftmost narrow visible button near the header = back arrow.
+    click_left_js = """
+        var buttons = document.querySelectorAll('button');
+        var leftmost = null;
+        var minX = 99999;
+        for (var i = 0; i < buttons.length; i++) {
+            var b = buttons[i];
+            if (!b.offsetParent) continue;
+            var r = b.getBoundingClientRect();
+            if (r.width > 5 && r.width < 50 && r.height > 5 && r.height < 50 && r.x < minX) {
+                minX = r.x;
+                leftmost = b;
+            }
+        }
+        if (leftmost) leftmost.click();
+    """
 
     for _ in range(24):
-        # Visible narrow buttons — the > arrow is one of these.
-        visible_buttons = []
-        for btn in driver.find_elements(By.TAG_NAME, "button"):
-            try:
-                if btn.is_displayed() and btn.size["width"] < 60:
-                    visible_buttons.append(btn)
-            except Exception:
-                pass
+        header_text = driver.execute_script(header_read_js)
+        print(f"   Calendar shows: {header_text}")
 
-        # Header text from any visible 'Month / YYYY' element.
-        current_month_text = ""
-        for el in driver.find_elements(By.XPATH, "//*"):
-            try:
-                if not el.is_displayed():
-                    continue
-                txt = (el.text or "").strip()
-                if re.match(
-                    r"^(January|February|March|April|May|June|July|August|"
-                    r"September|October|November|December)\s*/\s*\d{4}$",
-                    txt,
-                ):
-                    current_month_text = txt
-                    break
-            except Exception:
-                pass
+        if not header_text:
+            # Header unreadable — best-effort nudge forward and re-read.
+            driver.execute_script(click_right_js)
+            print("   Clicked > forward (no header yet)")
+            time.sleep(0.5)
+            continue
 
-        print(f'   Calendar month: "{current_month_text}"')
+        parts = header_text.replace(" ", "").split("/")
+        curr_month = month_names.index(parts[0]) + 1
+        curr_year = int(parts[1])
 
-        if current_month_text:
-            parts = current_month_text.replace(" ", "").split("/")
-            curr_month_name = parts[0]
-            curr_year = int(parts[1])
-            curr_month = month_names.index(curr_month_name) + 1
-
-            if curr_year == target_year and curr_month == target_month:
-                print("   On correct month!")
-                break
-
-            # Rightmost narrow button = next arrow.
-            if visible_buttons:
-                visible_buttons.sort(key=lambda b: b.location["x"], reverse=True)
-                try:
-                    driver.execute_script("arguments[0].click()", visible_buttons[0])
-                    print("   Clicked next arrow")
-                    time.sleep(0.5)
-                except Exception as e:
-                    print(f"   Arrow click failed: {e}")
-        else:
-            # Couldn't read the header — best-effort: click rightmost narrow
-            # button anyway so we eventually get to a readable state.
-            if visible_buttons:
-                visible_buttons.sort(key=lambda b: b.location["x"], reverse=True)
-                try:
-                    driver.execute_script("arguments[0].click()", visible_buttons[0])
-                    time.sleep(0.5)
-                except Exception:
-                    pass
-
-    # ---------- STEP 3: click the day ----------
-    time.sleep(0.5)
-    day_str = str(target_day)
-
-    day_clicked = False
-    for xpath in (
-        f'//td[normalize-space(.)="{day_str}" and not(contains(@class,"disabled")) '
-        f'and not(contains(@class,"gray")) and not(contains(@class,"outside"))]',
-        f'//td[normalize-space(.)="{day_str}"]',
-        f'//div[normalize-space(.)="{day_str}" and contains(@class,"Day")]',
-        f'//span[normalize-space(.)="{day_str}"]',
-    ):
-        for el in driver.find_elements(By.XPATH, xpath):
-            try:
-                if el.is_displayed():
-                    driver.execute_script("arguments[0].click()", el)
-                    print(f"   Clicked day {day_str}")
-                    day_clicked = True
-                    break
-            except Exception:
-                pass
-        if day_clicked:
+        if (curr_year, curr_month) == (target_year, target_month):
+            print("   On correct month!")
             break
+        if (curr_year, curr_month) < (target_year, target_month):
+            driver.execute_script(click_right_js)
+            print("   Clicked > forward")
+        else:
+            driver.execute_script(click_left_js)
+            print("   Clicked < backward")
+        time.sleep(0.5)
 
-    if not day_clicked:
+    # ---------- STEP 5: click the target day ----------
+    day_str = str(target_day)
+    day_clicked = driver.execute_script(
+        """
+        var target = arguments[0];
+        var cells = document.querySelectorAll('td, [role="gridcell"]');
+        for (var i = 0; i < cells.length; i++) {
+            var cell = cells[i];
+            if (!cell.offsetParent) continue;
+            var text = cell.textContent.trim();
+            if (text === target) {
+                var cls = cell.className || '';
+                if (cls.indexOf('disabled') >= 0 || cls.indexOf('gray') >= 0 || cls.indexOf('outside') >= 0) continue;
+                cell.click();
+                return true;
+            }
+        }
+        return false;
+        """,
+        day_str,
+    )
+    if day_clicked:
+        print(f"   Selected day {day_str}")
+    else:
         print(f"   WARNING: Could not click day {day_str}")
 
+    # ---------- STEP 6: wait + Escape to close the calendar ----------
     time.sleep(1)
-    # Close the calendar with Escape — body-click was swallowed by some builds.
     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
     time.sleep(0.5)
 
