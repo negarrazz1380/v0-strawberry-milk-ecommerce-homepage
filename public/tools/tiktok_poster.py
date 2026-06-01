@@ -572,95 +572,126 @@ def set_schedule_datetime(driver, date_str: str, time_str: str) -> bool:
     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
     time.sleep(0.5)
 
-    # ---------- STEP 4: open the time picker ----------
-    time_inputs = driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input")
-    time_input = None
-    for inp in time_inputs:
-        val = inp.get_attribute("value") or ""
-        if re.match(r"\d{2}:\d{2}", val):
-            time_input = inp
+    # ===== TIME =====
+    # Open time picker
+    for inp in driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input"):
+        v = inp.get_attribute("value") or ""
+        if re.match(r"\d{2}:\d{2}", v):
+            driver.execute_script("arguments[0].click()", inp)
             break
-
-    if not time_input:
-        print("   ERROR: Could not find time input")
-        return False
-
-    driver.execute_script("arguments[0].click()", time_input)
     time.sleep(2)
-    print("   Opened time picker")
 
-    # ---------- STEP 5: click hour + minute ----------
-    # No bulk scrollTop=0 here — resetting whole columns scrolled the
-    # selection out from under the click. Each hour/minute click uses
-    # `scrollIntoView({block:'center'})` to bring its own target into the
-    # viewport without disturbing the rest of the page.
-    # Hour: leaf elements with exact text, small footprint (column cell).
-    hour_str = f"{target_hour:02d}"
-    hour_clicked = driver.execute_script(
-        """
-        var target = arguments[0];
+    # STEP 1: Scroll hour into view
+    hs = f"{target_hour:02d}"
+    driver.execute_script("""
+        var t = arguments[0];
         var all = document.querySelectorAll('*');
+        var candidates = [];
         for (var i = 0; i < all.length; i++) {
             var el = all[i];
-            if (el.offsetParent === null) continue;
+            if (!el.offsetParent) continue;
             if (el.children.length > 0) continue;
-            if (el.textContent.trim() !== target) continue;
-            var rect = el.getBoundingClientRect();
-            if (rect.width < 80 && rect.height < 50) {
-                el.scrollIntoView({block: 'center'});
-                el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,view:window}));
-                el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,cancelable:true,view:window}));
-                el.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,view:window}));
-                return 'clicked ' + target;
+            if (el.textContent.trim() !== t) continue;
+            var r = el.getBoundingClientRect();
+            if (r.width > 10 && r.width < 80 && r.height > 10 && r.height < 50) {
+                candidates.push({el: el, x: r.x});
             }
         }
-        return 'not found';
-        """,
-        hour_str,
-    )
-    print(f"   Hour result: {hour_clicked}")
-    # Give React a beat to commit the hour selection before we go hunting
-    # for the minute — the minute column rebuilds on hour change.
-    time.sleep(1)
-
-    # Minute: same leaf-cell pattern + same three-event dispatch.
-    min_str = f"{target_minute:02d}"
-    min_clicked = driver.execute_script(
-        """
-        var target = arguments[0];
-        var all = document.querySelectorAll('*');
-        for (var i = 0; i < all.length; i++) {
-            var el = all[i];
-            if (el.offsetParent === null) continue;
-            if (el.children.length > 0) continue;
-            if (el.textContent.trim() !== target) continue;
-            var rect = el.getBoundingClientRect();
-            if (rect.width < 80 && rect.height < 50) {
-                el.scrollIntoView({block: 'center'});
-                el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,view:window}));
-                el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true,cancelable:true,view:window}));
-                el.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,view:window}));
-                return 'clicked ' + target;
-            }
+        candidates.sort(function(a,b) { return a.x - b.x; });
+        if (candidates.length > 0) {
+            candidates[0].el.scrollIntoView({block: 'center'});
         }
-        return 'not found';
-        """,
-        min_str,
-    )
-    print(f"   Minute result: {min_clicked}")
+    """, hs)
     time.sleep(0.5)
 
-    # Close time picker.
+    # STEP 2: Now click the hour with real mouse events (separate call so scrollIntoView has finished)
+    hr = driver.execute_script("""
+        var t = arguments[0];
+        var all = document.querySelectorAll('*');
+        var candidates = [];
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== t) continue;
+            var r = el.getBoundingClientRect();
+            if (r.width > 10 && r.width < 80 && r.height > 10 && r.height < 50) {
+                candidates.push({el: el, x: r.x});
+            }
+        }
+        candidates.sort(function(a,b) { return a.x - b.x; });
+        if (candidates.length > 0) {
+            var h = candidates[0].el;
+            h.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true, view:window}));
+            h.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true, view:window}));
+            h.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window}));
+            return 'clicked ' + t + ' at x=' + Math.round(candidates[0].x);
+        }
+        return 'not found';
+    """, hs)
+    print(f"   Hour {hs}: {hr}")
+    time.sleep(1.5)
+
+    # STEP 3: Scroll minute into view
+    ms = f"{target_minute:02d}"
+    driver.execute_script("""
+        var t = arguments[0];
+        var all = document.querySelectorAll('*');
+        var candidates = [];
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== t) continue;
+            var r = el.getBoundingClientRect();
+            if (r.width > 10 && r.width < 80 && r.height > 10 && r.height < 50) {
+                candidates.push({el: el, x: r.x});
+            }
+        }
+        candidates.sort(function(a,b) { return b.x - a.x; });
+        if (candidates.length > 0) {
+            candidates[0].el.scrollIntoView({block: 'center'});
+        }
+    """, ms)
+    time.sleep(0.5)
+
+    # STEP 4: Click minute with real mouse events
+    mr = driver.execute_script("""
+        var t = arguments[0];
+        var all = document.querySelectorAll('*');
+        var candidates = [];
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (!el.offsetParent) continue;
+            if (el.children.length > 0) continue;
+            if (el.textContent.trim() !== t) continue;
+            var r = el.getBoundingClientRect();
+            if (r.width > 10 && r.width < 80 && r.height > 10 && r.height < 50) {
+                candidates.push({el: el, x: r.x});
+            }
+        }
+        candidates.sort(function(a,b) { return b.x - a.x; });
+        if (candidates.length > 0) {
+            var m = candidates[0].el;
+            m.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true, view:window}));
+            m.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true, view:window}));
+            m.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window}));
+            return 'clicked ' + t + ' at x=' + Math.round(candidates[0].x);
+        }
+        return 'not found';
+    """, ms)
+    print(f"   Minute {ms}: {mr}")
+    time.sleep(1.5)
+
+    # Close time picker
     driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
     time.sleep(1)
 
-    # Sanity-check: log the current values so the operator can see what
-    # the inputs actually contain after we drove them.
+    # Print final values
     for inp in driver.find_elements(By.CSS_SELECTOR, "input.TUXTextInputCore-input"):
-        val = inp.get_attribute("value") or ""
-        if val:
-            print(f"   Input value: {val}")
-
+        v = inp.get_attribute("value") or ""
+        if v:
+            print(f"   Final: {v}")
     return True
 
 
