@@ -706,17 +706,18 @@
     try { seeded = localStorage.getItem("ck_calendar_seeded_v17"); } catch (e) { return; }
     if (seeded != null) return;
 
-    // (case, concept) recipe. Per-case totals are tuned to the video
-    // library: e.g. Butter Bear has 9 files so it gets 18 slots; Wavy
-    // has 1 file so it gets 2.
+    // (case, concept) recipe. Per-case totals track the video library:
+    // each case gets ~2 slots per video file it has on disk, with combos
+    // chosen to cover every (case, concept) pair you've actually filmed.
+    // 32 combos × varying counts = 84 slots.
     var COMBO_COUNTS = [
       { product: "Bow Black",   archetype: "IT Girl Phone Check",          count: 3 },
       { product: "Bow Cherry",  archetype: "ASMR Unboxing",                count: 3 },
       { product: "Bow Cherry",  archetype: "Small Business BTS",           count: 3 },
-      { product: "Bow Cherry",  archetype: "IT Girl Phone Check",          count: 4 },
+      { product: "Bow Cherry",  archetype: "IT Girl Phone Check",          count: 3 },
       { product: "Bow Diamond", archetype: "ASMR Unboxing",                count: 3 },
       { product: "Bow Diamond", archetype: "Small Business BTS",           count: 2 },
-      { product: "Bow Diamond", archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Bow Diamond", archetype: "IT Girl Phone Check",          count: 2 },
       { product: "Bow Diamond", archetype: "Influencer Ranking Haul",      count: 2 },
       { product: "Burger",      archetype: "Before/After Ugly Case",       count: 3 },
       { product: "Burger",      archetype: "Small Business BTS",           count: 2 },
@@ -724,19 +725,24 @@
       { product: "Butter Bear", archetype: "ASMR Unboxing",                count: 4 },
       { product: "Butter Bear", archetype: "Didn't Know This Existed",     count: 4 },
       { product: "Butter Bear", archetype: "Founder Story",                count: 2 },
-      { product: "Butter Bear", archetype: "IT Girl Phone Check",          count: 4 },
-      { product: "Butter Bear", archetype: "Satisfying Loop Click",        count: 4 },
+      { product: "Butter Bear", archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Butter Bear", archetype: "Satisfying Loop Click",        count: 3 },
       { product: "Cherry",      archetype: "ASMR Unboxing",                count: 3 },
       { product: "Cherry",      archetype: "Fruit Case Trend",             count: 2 },
-      { product: "Cherry",      archetype: "GRWM Morning Routine",         count: 3 },
+      { product: "Cherry",      archetype: "GRWM Morning Routine",         count: 2 },
       { product: "Dachshund",   archetype: "Founder Story",                count: 3 },
-      { product: "Dachshund",   archetype: "Cases I've Been Gatekeeping",  count: 6 },
+      { product: "Dachshund",   archetype: "Cases I've Been Gatekeeping",  count: 4 },
       { product: "Dachshund",   archetype: "Should Be Illegal Hook",       count: 3 },
+      { product: "Dachshund",   archetype: "ASMR Unboxing",                count: 2 },
+      { product: "Dachshund",   archetype: "GRWM Morning Routine",         count: 2 },
       { product: "Mario",       archetype: "Before/After Ugly Case",       count: 3 },
-      { product: "Mario",       archetype: "My Boyfriend Hates It",        count: 3 },
-      { product: "Mario",       archetype: "IT Girl Phone Check",          count: 4 },
-      { product: "Puppy",       archetype: "IT Girl Phone Check",          count: 3 },
-      { product: "Wavy",        archetype: "POV Outfit Match",             count: 2 }
+      { product: "Mario",       archetype: "My Boyfriend Hates It",        count: 2 },
+      { product: "Mario",       archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Mario",       archetype: "ASMR Unboxing",                count: 2 },
+      { product: "Puppy",       archetype: "IT Girl Phone Check",          count: 2 },
+      { product: "Puppy",       archetype: "Should Be Illegal Hook",       count: 2 },
+      { product: "Wavy",        archetype: "POV Outfit Match",             count: 2 },
+      { product: "Wavy",        archetype: "Girl Math Comedy",             count: 2 }
     ];
 
     // One caption per archetype: lowercase, punchy, emoji + #casekisses +
@@ -745,6 +751,7 @@
       "ASMR Unboxing":                "the pink box opens different 📦🎀 #casekisses #asmrunboxing",
       "Before/After Ugly Case":       "from ugly to obsessed in 3 seconds ✨ #casekisses #glowup",
       "POV Outfit Match":             "when your case matches the fit 🎯💕 #casekisses #outfitmatch",
+      "Girl Math Comedy":             "girl math says it pays for itself 🧮🎀 #casekisses #girlmath",
       "Cases I've Been Gatekeeping":  "not gatekeeping these anymore 😩 #casekisses #gatekeeping",
       "GRWM Morning Routine":         "grwm + casing my phone with me ☀️🎀 #casekisses #grwm",
       "Satisfying Loop Click":        "the click hits different 🔁✨ #casekisses #satisfying",
