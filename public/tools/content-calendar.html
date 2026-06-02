@@ -694,7 +694,7 @@
   var detailKey = null;
 
   // ---------- seed ----------
-  // Versioned gate: bumps to ck_calendar_seeded_v17 trigger a full reseed.
+  // Versioned gate: bumps to ck_calendar_seeded_v18 trigger a full reseed.
   // The seed is generated procedurally from COMBO_COUNTS — every (case,
   // concept) combo must appear in the strict matcher's list, and the
   // per-case counts track how many actual video files exist on disk for
@@ -703,7 +703,7 @@
   // strict matcher.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v17"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v18"); } catch (e) { return; }
     if (seeded != null) return;
 
     // (case, concept) recipe. Per-case totals track the video library:
@@ -845,7 +845,7 @@
       };
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v17", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v18", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
