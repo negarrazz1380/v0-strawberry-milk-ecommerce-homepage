@@ -1396,35 +1396,44 @@
     { product: "Puppy",              patterns: ["puppy"] },
     { product: "Burger",             patterns: ["burger"] }
   ];
+  // Strict keyword list — only these exact substrings count as a concept
+  // match. Earlier-loose patterns like "unbox", "before", "outfit",
+  // "loop", "morning", "behind", "fruit", "drop", "review", "vibe",
+  // "desk", "hand", "handcover", "didnt" were intentionally pruned: the
+  // poster requires both case AND concept to match exactly, so loose
+  // patterns cause cross-archetype confusion (e.g. "loop" landing on
+  // ASMR cards). Not Gatekeeping is checked before Cases I've Been
+  // Gatekeeping so files containing "notgatekeep" never fall through to
+  // the broader "gatekeep" rule.
   var FILENAME_CONCEPT_RULES = [
-    { archetype: "Not Gatekeeping",                 patterns: ["notgatekeep", "not_gate"] },
-    { archetype: "Cases I've Been Gatekeeping",     patterns: ["gatekeep"], exclude: ["notgatekeep", "not_gate"] },
-    { archetype: "Unboxing Surprise Gift",          patterns: ["giftunbox", "gift", "surprise"] },
-    { archetype: "ASMR Unboxing",                   patterns: ["asmr", "unbox"] },
+    { archetype: "Not Gatekeeping",                 patterns: ["notgatekeep"] },
+    { archetype: "Cases I've Been Gatekeeping",     patterns: ["gatekeep"], exclude: ["notgatekeep"] },
+    { archetype: "Unboxing Surprise Gift",          patterns: ["giftunbox", "gift"] },
+    { archetype: "ASMR Unboxing",                   patterns: ["asmr"] },
     { archetype: "Outfit Swap Transition",          patterns: ["outfitswap", "swap"] },
-    { archetype: "POV Outfit Match",                patterns: ["outfitmatch", "outfit", "pov"] },
-    { archetype: "Before/After Ugly Case",          patterns: ["beforeafter", "ugly", "before", "glowup"] },
-    { archetype: "Girl Math Comedy",                patterns: ["girlmath", "girl_math"] },
-    { archetype: "Which One Matches Your Vibe",     patterns: ["whichone", "vibe"] },
-    { archetype: "Rate My Phone Setup",             patterns: ["desksetup", "desk", "setup"] },
+    { archetype: "POV Outfit Match",                patterns: ["outfitmatch"] },
+    { archetype: "Before/After Ugly Case",          patterns: ["beforeafter"] },
+    { archetype: "Girl Math Comedy",                patterns: ["girlmath"] },
+    { archetype: "Which One Matches Your Vibe",     patterns: ["whichone"] },
+    { archetype: "Rate My Phone Setup",             patterns: ["desksetup", "setup"] },
     { archetype: "Stitch Bait",                     patterns: ["stitch"] },
-    { archetype: "GRWM Morning Routine",            patterns: ["grwm", "morning"] },
-    { archetype: "Satisfying Loop Click",           patterns: ["satisfying", "loop", "click"] },
-    { archetype: "Small Business BTS",              patterns: ["bts", "behind", "packing"] },
-    { archetype: "Fruit Case Trend",                patterns: ["fruittrend", "fruit"] },
+    { archetype: "GRWM Morning Routine",            patterns: ["grwm"] },
+    { archetype: "Satisfying Loop Click",           patterns: ["satisfying"] },
+    { archetype: "Small Business BTS",              patterns: ["bts"] },
+    { archetype: "Fruit Case Trend",                patterns: ["fruittrend"] },
     { archetype: "My Boyfriend Hates It",           patterns: ["boyfriend"] },
-    { archetype: "IT Girl Phone Check",             patterns: ["itgirl", "it_girl", "editorial"] },
+    { archetype: "IT Girl Phone Check",             patterns: ["itgirl", "editorial"] },
     { archetype: "Canadian Small Business",         patterns: ["canadian"] },
     { archetype: "Compliment Magnet",               patterns: ["compliment"] },
     { archetype: "Nostalgia Hit",                   patterns: ["nostalgia"] },
-    { archetype: "Hand Covers Camera Transition",   patterns: ["handtransition", "handcover", "hand"] },
-    { archetype: "Falling Phone Transition",        patterns: ["fallingphone", "falling", "drop"] },
-    { archetype: "PR Package Haul",                 patterns: ["prhaul", "pr_haul"] },
+    { archetype: "Hand Covers Camera Transition",   patterns: ["handtransition"] },
+    { archetype: "Falling Phone Transition",        patterns: ["fallingphone", "falling"] },
+    { archetype: "PR Package Haul",                 patterns: ["prhaul"] },
     { archetype: "Influencer Ranking Haul",         patterns: ["ranking"] },
-    { archetype: "Honest Review 2 Weeks",           patterns: ["honestrev", "honest", "review"] },
+    { archetype: "Honest Review 2 Weeks",           patterns: ["honestrev", "honest"] },
     { archetype: "Should Be Illegal Hook",          patterns: ["illegal"] },
     { archetype: "Founder Story",                   patterns: ["founder", "brandintro"] },
-    { archetype: "Didn't Know This Existed",        patterns: ["didntknow", "didnt"] }
+    { archetype: "Didn't Know This Existed",        patterns: ["didntknow"] }
   ];
 
   function applyFilenameRules(filename, rules, field) {
@@ -1448,45 +1457,18 @@
     return null;
   }
 
-  // Returns every archetype the filename "suggests" — order matters in the
-  // rule list (specific first) so the FIRST hit is treated as the primary
-  // signal. Used to score candidate cards.
-  function detectFilenameConcepts(filename) {
-    var n = String(filename || "").toLowerCase();
-    var seen = {};
-    var primary = null;
-    for (var i = 0; i < FILENAME_CONCEPT_RULES.length; i++) {
-      var rule = FILENAME_CONCEPT_RULES[i];
-      if (rule.exclude) {
-        var excluded = false;
-        for (var k = 0; k < rule.exclude.length; k++) {
-          if (n.indexOf(rule.exclude[k]) !== -1) { excluded = true; break; }
-        }
-        if (excluded) continue;
-      }
-      var hit = false;
-      for (var j = 0; j < rule.patterns.length; j++) {
-        if (n.indexOf(rule.patterns[j]) !== -1) { hit = true; break; }
-      }
-      if (hit) {
-        seen[rule.archetype] = true;
-        if (!primary) primary = rule.archetype;
-      }
-    }
-    return { primary: primary, signals: Object.keys(seen) };
-  }
-
-  // Plan assignments without mutating `data`. Strategy:
-  //   1. Resolve the file's case via FILENAME_CASE_RULES. No case → unmatched.
-  //   2. Build the candidate pool: cards where status === "planned" AND
-  //      videoFilePath is empty AND product === detected case. Already-
-  //      confirmed and posted cards are excluded — case-locked, never
-  //      overwritten.
-  //   3. Score each candidate: 2 if its archetype equals the file's primary
-  //      detected concept, 1 if it matches any of the file's other concept
-  //      signals, 0 otherwise. Highest wins; ties broken by earliest slot key.
-  //   4. Remove the chosen card from the pool so the next file picks a
-  //      different one (one file → one card per round).
+  // Plan assignments without mutating `data`. STRICT both-must-match rule:
+  //   1. Resolve the file's case via FILENAME_CASE_RULES and concept via
+  //      FILENAME_CONCEPT_RULES. If either fails → "unreadable".
+  //   2. Look for an open slot (planned, no video) where product === case
+  //      AND archetype === concept. The first such slot in date/slot order
+  //      wins. No fallback, no scoring — wrong-concept videos stay
+  //      unplaced rather than land on the wrong caption.
+  //   3. If no slot matches both → "noSlot" (the file's case+concept combo
+  //      isn't on the calendar). The slot stays planned.
+  //   4. Remove the chosen slot from the pool so a second video for the
+  //      same combo (e.g. butterbear_asmr.mp4, butterbear_asmr_3.mp4)
+  //      fills a different slot.
   function computeAutoMatchPlan(files) {
     var openByCase = {};
     Object.keys(data).forEach(function (k) {
@@ -1501,41 +1483,43 @@
     });
 
     var assignments = [];
-    var unmatched = [];
+    var noSlot = [];      // case + concept detected, no slot matches both
+    var unreadable = [];  // case or concept couldn't be parsed from filename
 
     for (var i = 0; i < files.length; i++) {
       var name = files[i].name;
       var caseName = applyFilenameRules(name, FILENAME_CASE_RULES, "product");
-      if (!caseName) {
-        unmatched.push({ file: name, reason: "couldn't detect case" });
+      var archetype = applyFilenameRules(name, FILENAME_CONCEPT_RULES, "archetype");
+
+      if (!caseName || !archetype) {
+        unreadable.push({
+          file: name,
+          reason: !caseName && !archetype ? "no case or concept" :
+                  !caseName ? "no case" : "no concept"
+        });
         continue;
       }
+
       var candidates = openByCase[caseName] || [];
-      if (candidates.length === 0) {
-        unmatched.push({ file: name, reason: "no open " + caseName + " slots" });
+      var foundIdx = -1;
+      for (var j = 0; j < candidates.length; j++) {
+        if (candidates[j].entry.archetype === archetype) { foundIdx = j; break; }
+      }
+      if (foundIdx === -1) {
+        noSlot.push({ file: name, product: caseName, archetype: archetype });
         continue;
       }
-      var concept = detectFilenameConcepts(name);
-      var bestIdx = 0, bestScore = -1;
-      for (var j = 0; j < candidates.length; j++) {
-        var arch = candidates[j].entry.archetype;
-        var score = 0;
-        if (concept.primary === arch) score = 2;
-        else if (concept.signals.indexOf(arch) !== -1) score = 1;
-        if (score > bestScore) { bestScore = score; bestIdx = j; }
-      }
-      var chosen = candidates.splice(bestIdx, 1)[0];
+
+      var chosen = candidates.splice(foundIdx, 1)[0];
       assignments.push({
         file: name,
         key: chosen.key,
         product: caseName,
-        archetype: chosen.entry.archetype,
-        primary: concept.primary,
-        score: bestScore
+        archetype: chosen.entry.archetype
       });
     }
 
-    return { assignments: assignments, unmatched: unmatched };
+    return { assignments: assignments, noSlot: noSlot, unreadable: unreadable };
   }
 
   function applyAutoMatchPlan(plan) {
@@ -1556,10 +1540,9 @@
   function showAutoMatchPreview(plan, files, title, continueLabel, onConfirm, extras) {
     extras = extras || {};
     var html = '<p style="margin: 0 0 10px 0;">' +
-      '<strong>✅ ' + plan.assignments.length + '</strong> file' +
-      (plan.assignments.length === 1 ? "" : "s") + ' will be matched to slots<br>' +
-      '<strong>⚠️ ' + plan.unmatched.length + '</strong> file' +
-      (plan.unmatched.length === 1 ? "" : "s") + " couldn't be matched";
+      '<strong>✅ ' + plan.assignments.length + '</strong> matched (case + concept)<br>' +
+      '<strong>⚠️ ' + plan.noSlot.length + '</strong> no matching slot<br>' +
+      '<strong>❌ ' + plan.unreadable.length + '</strong> unreadable filename';
     if (typeof extras.skippedPosted === "number") {
       html += '<br><strong>⏭️ ' + extras.skippedPosted + '</strong> card' +
         (extras.skippedPosted === 1 ? "" : "s") + ' already posted (skipped)';
@@ -1567,22 +1550,29 @@
     html += "</p>";
 
     if (plan.assignments.length) {
-      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">Will assign:</h3>';
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: var(--pink-dark);">✅ Matched (case + concept):</h3>';
       html += '<ul style="margin: 0; padding-left: 18px;">';
       plan.assignments.forEach(function (a) {
-        var hint = a.score === 2 ? " 🎯" :
-                   a.score === 1 ? " (concept partial match)" :
-                                   " (earliest slot, no concept match)";
         html += "<li>" + esc(a.file) + " → " + esc(humanContext(a.key)) + " — " +
-          esc(a.product) + " + " + esc(a.archetype) + hint + "</li>";
+          esc(a.product) + " + " + esc(a.archetype) + "</li>";
       });
       html += "</ul>";
     }
 
-    if (plan.unmatched.length) {
-      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b91c1c;">Files I couldn\'t place:</h3>';
+    if (plan.noSlot.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b45309;">⚠️ No matching slot:</h3>';
       html += '<ul style="margin: 0; padding-left: 18px;">';
-      plan.unmatched.forEach(function (u) {
+      plan.noSlot.forEach(function (n) {
+        html += "<li>" + esc(n.file) + " — " + esc(n.product) + " + " + esc(n.archetype) +
+          " (no open calendar slot for this combo)</li>";
+      });
+      html += "</ul>";
+    }
+
+    if (plan.unreadable.length) {
+      html += '<h3 style="font-size:14px; margin: 14px 0 6px 0; color: #b91c1c;">❌ Unreadable filename:</h3>';
+      html += '<ul style="margin: 0; padding-left: 18px;">';
+      plan.unreadable.forEach(function (u) {
         html += "<li>" + esc(u.file) + " (" + esc(u.reason) + ")</li>";
       });
       html += "</ul>";
