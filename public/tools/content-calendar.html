@@ -688,163 +688,157 @@
     return tpl.replace(/\[CASE\]/g, product || "");
   }
 
-  // 28-day content plan, May 29 – Jun 25 2026. 28 archetypes spread
-  // across the month — no format repeats more than twice per week.
-  // SEED keeps videoPrompt blank; seedPlan() renders the default prompt from
-  // PROMPT_TEMPLATES at seed time (with [CASE] → product). v12 migrates the
-  // legacy `videoFile` field to `videoFilePath` (the slot ID is now the
-  // user-facing filename and is computed from the slot's date/time/product/
-  // archetype at render time).
-  var SEED = [
-    { date: "2026-05-29", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "ASMR Unboxing", caption: "the pink box opening is sending me 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
-    { date: "2026-05-29", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "before vs after my phone met its match 📱➡️🎀 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
-    { date: "2026-05-29", slot: "7pm", platform: "TikTok", product: "Puppy", archetype: "Should Be Illegal Hook", caption: "pov: ur case matches the fit 💕 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-05-30", slot: "7am", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "Girl Math Comedy", caption: "girl math says if it makes u happy it's free 🎀 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-05-30", slot: "11am", platform: "Both", product: "Bow Cherry", archetype: "Fruit Case Trend", caption: "not gatekeeping these anymore 😩 link below #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-05-30", slot: "7pm", platform: "TikTok", product: "Cherry", archetype: "Nostalgia Hit", caption: "comment your aesthetic and i'll match ur case 🎀 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-05-31", slot: "7am", platform: "TikTok", product: "Burger", archetype: "GRWM Morning Routine", caption: "rate my phone setup /10 🎀 #casekisses #phonesetup", sound: "", videoPrompt: "" },
-    { date: "2026-05-31", slot: "11am", platform: "Both", product: "Mario", archetype: "PR Package Haul", caption: "stitch this with your phone case 📱 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-05-31", slot: "7pm", platform: "TikTok", product: "Wavy", archetype: "Hand Covers Camera Transition", caption: "every tissue paper crinkle 😮‍💨 #casekisses #asmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-01", slot: "7am", platform: "TikTok", product: "Bow Diamond", archetype: "IT Girl Phone Check", caption: "the old case is in the trash where she belongs 😭 #casekisses #phoneupgrade", sound: "", videoPrompt: "" },
-    { date: "2026-06-01", slot: "11am", platform: "Instagram", product: "Dachshund", archetype: "Influencer Ranking Haul", caption: "main character with matching accessories 🎀 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-01", slot: "7pm", platform: "TikTok", product: "Butter Bear", archetype: "Outfit Swap Transition", caption: "girl math: ÷ by daily compliments = essentially free 💕 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-02", slot: "7am", platform: "TikTok", product: "Puppy", archetype: "Not Gatekeeping", caption: "ok i'm finally sharing 🎀 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-02", slot: "11am", platform: "Both", product: "Hello Kitty Cherry", archetype: "Small Business BTS", caption: "which one are u 1 2 or 3 ✨ #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-02", slot: "7pm", platform: "TikTok", product: "Bow Cherry", archetype: "Falling Phone Transition", caption: "ok my phone corner ate 💕 #casekisses #deskaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-03", slot: "7am", platform: "TikTok", product: "Cherry", archetype: "Which One Matches Your Vibe", caption: "duet me with ur case i need to see 👀 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-03", slot: "11am", platform: "Both", product: "Burger", archetype: "Honest Review 2 Weeks", caption: "this lid pop hits different 📦✨ #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
-    { date: "2026-06-03", slot: "7pm", platform: "TikTok", product: "Mario", archetype: "Founder Story", caption: "swipe to see the glow up 🥹 #casekisses #beforeandafter", sound: "", videoPrompt: "" },
-    { date: "2026-06-04", slot: "7am", platform: "TikTok", product: "Wavy", archetype: "Satisfying Loop Click", caption: "she always coordinates 😌 #casekisses #ootdaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-04", slot: "11am", platform: "Both", product: "Bow Diamond", archetype: "Compliment Magnet", caption: "girl math: old case broke so this one is technically free 😭 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-04", slot: "7pm", platform: "TikTok", product: "Dachshund", archetype: "Didn't Know This Existed", caption: "you guys forced me to tell you 😭 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-05", slot: "7am", platform: "TikTok", product: "Butter Bear", archetype: "ASMR Unboxing", caption: "tag a friend who'd pick #1 💕 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-05", slot: "11am", platform: "Both", product: "Puppy", archetype: "Unboxing Surprise Gift", caption: "rate my pink-coded desk 🎀 #casekisses #phonesetup", sound: "", videoPrompt: "" },
-    { date: "2026-06-05", slot: "7pm", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "POV Outfit Match", caption: "stitch this if u have a casekisses case 🎀 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-06", slot: "7am", platform: "TikTok", product: "Bow Cherry", archetype: "Cases I've Been Gatekeeping", caption: "the way it slides out of the wrap 🤍 #casekisses #unboxingasmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-06", slot: "11am", platform: "Both", product: "Cherry", archetype: "My Boyfriend Hates It", caption: "phone glow up szn ✨ #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
-    { date: "2026-06-06", slot: "7pm", platform: "TikTok", product: "Burger", archetype: "Rate My Phone Setup", caption: "the case is half the outfit fr 📱✨ #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-07", slot: "7am", platform: "TikTok", product: "Mario", archetype: "Before/After Ugly Case", caption: "girl math: it's an investment in my aesthetic 🎀 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-07", slot: "11am", platform: "Both", product: "Wavy", archetype: "PR Package Haul", caption: "the case i was hiding from u 🤫 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-07", slot: "7pm", platform: "TikTok", product: "Bow Diamond", archetype: "Hand Covers Camera Transition", caption: "which case = ur energy this week 🎀 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-08", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "GRWM Morning Routine", caption: "phone setup tour 📱 #casekisses #deskaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-08", slot: "11am", platform: "Instagram", product: "Butter Bear", archetype: "Influencer Ranking Haul", caption: "comment ur case story and i'll respond 💕 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-08", slot: "7pm", platform: "TikTok", product: "Puppy", archetype: "Should Be Illegal Hook", caption: "no music. just packaging 😌 #casekisses #asmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-09", slot: "7am", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "Canadian Small Business", caption: "i upgraded and i'm not sorry 🎀 #casekisses #beforeandafter", sound: "", videoPrompt: "" },
-    { date: "2026-06-09", slot: "11am", platform: "Both", product: "Bow Cherry", archetype: "Fruit Case Trend", caption: "pov: ur phone is part of the look 🎀 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-09", slot: "7pm", platform: "TikTok", product: "Cherry", archetype: "Outfit Swap Transition", caption: "girl math: i saved on therapy 🥹 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-10", slot: "7am", platform: "TikTok", product: "Burger", archetype: "Stitch Bait", caption: "gatekeeping era is over ✨ #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-10", slot: "11am", platform: "Both", product: "Mario", archetype: "Honest Review 2 Weeks", caption: "pick one and lemme guess your sign 😌 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-10", slot: "7pm", platform: "TikTok", product: "Wavy", archetype: "Nostalgia Hit", caption: "this is what girlhood looks like 🎀 #casekisses #phonesetup", sound: "", videoPrompt: "" },
-    { date: "2026-06-11", slot: "7am", platform: "TikTok", product: "Bow Diamond", archetype: "Satisfying Loop Click", caption: "duet ur case + caption it 🎀 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-11", slot: "11am", platform: "Both", product: "Dachshund", archetype: "Not Gatekeeping", caption: "tape rip therapy 📦🎀 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
-    { date: "2026-06-11", slot: "7pm", platform: "TikTok", product: "Butter Bear", archetype: "Falling Phone Transition", caption: "the difference is criminal 😩 #casekisses #phoneupgrade", sound: "", videoPrompt: "" },
-    { date: "2026-06-12", slot: "7am", platform: "TikTok", product: "Puppy", archetype: "ASMR Unboxing", caption: "matching set bc i'm her 💕 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-12", slot: "11am", platform: "Both", product: "Hello Kitty Cherry", archetype: "Girl Math Comedy", caption: "girl math: under $40 is basically pocket change 💕 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-12", slot: "7pm", platform: "TikTok", product: "Bow Cherry", archetype: "Didn't Know This Existed", caption: "i tried to keep her to myself 🥺 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-13", slot: "7am", platform: "TikTok", product: "Cherry", archetype: "IT Girl Phone Check", caption: "comment ur vibe ill match the case 🎀 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-13", slot: "11am", platform: "Both", product: "Burger", archetype: "Small Business BTS", caption: "rate my cozy desk era 🥹 #casekisses #deskaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-13", slot: "7pm", platform: "TikTok", product: "Mario", archetype: "POV Outfit Match", caption: "stitch ur case reveal here 📱✨ #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-14", slot: "7am", platform: "TikTok", product: "Wavy", archetype: "Which One Matches Your Vibe", caption: "phone case but make it audio 🎧 #casekisses #asmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-14", slot: "11am", platform: "Both", product: "Bow Diamond", archetype: "Unboxing Surprise Gift", caption: "from sad to served 💕 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
-    { date: "2026-06-14", slot: "7pm", platform: "TikTok", product: "Dachshund", archetype: "Hand Covers Camera Transition", caption: "case + fit = serve 🎀 #casekisses #ootdaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-15", slot: "7am", platform: "TikTok", product: "Butter Bear", archetype: "Before/After Ugly Case", caption: "girl math: matching ur phone is a productivity hack 🎀 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-15", slot: "11am", platform: "Instagram", product: "Puppy", archetype: "PR Package Haul", caption: "fine here's the case 🎀 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-15", slot: "7pm", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "Founder Story", caption: "which one matches ur outfit today 📱 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-16", slot: "7am", platform: "TikTok", product: "Bow Cherry", archetype: "Cases I've Been Gatekeeping", caption: "phone + perfume + lipgloss = home 💕 #casekisses #phonesetup", sound: "", videoPrompt: "" },
-    { date: "2026-06-16", slot: "11am", platform: "Both", product: "Cherry", archetype: "Compliment Magnet", caption: "show me ur fav case stitch this 💕 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-16", slot: "7pm", platform: "TikTok", product: "Burger", archetype: "Outfit Swap Transition", caption: "the snap-on click owns me 📱 #casekisses #asmrunboxing", sound: "", videoPrompt: "" },
-    { date: "2026-06-17", slot: "7am", platform: "TikTok", product: "Mario", archetype: "GRWM Morning Routine", caption: "rip ugly old case 🪦 #casekisses #phoneupgrade", sound: "", videoPrompt: "" },
-    { date: "2026-06-17", slot: "11am", platform: "Both", product: "Wavy", archetype: "My Boyfriend Hates It", caption: "she dressed her phone first 😩 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-17", slot: "7pm", platform: "TikTok", product: "Bow Diamond", archetype: "Should Be Illegal Hook", caption: "girl math: cute = essential expense 📱✨ #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-18", slot: "7am", platform: "TikTok", product: "Dachshund", archetype: "Satisfying Loop Click", caption: "spilling the case tea 🫖 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-18", slot: "11am", platform: "Both", product: "Butter Bear", archetype: "Influencer Ranking Haul", caption: "drop ur color and i'll pick ur case 💕 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-18", slot: "7pm", platform: "TikTok", product: "Puppy", archetype: "Falling Phone Transition", caption: "rate this main character desk /10 ✨ #casekisses #deskaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-19", slot: "7am", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "ASMR Unboxing", caption: "stitch this with ur emotional support case 🥹 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-19", slot: "11am", platform: "Both", product: "Bow Cherry", archetype: "Honest Review 2 Weeks", caption: "bubble wrap pops i could listen to forever 🫧 #casekisses #asmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-19", slot: "7pm", platform: "TikTok", product: "Cherry", archetype: "Nostalgia Hit", caption: "the upgrade i didn't know i needed 📱 #casekisses #beforeandafter", sound: "", videoPrompt: "" },
-    { date: "2026-06-20", slot: "7am", platform: "TikTok", product: "Burger", archetype: "Not Gatekeeping", caption: "pov: phone case as accessory 📱🎀 #casekisses #ootdaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-20", slot: "11am", platform: "Both", product: "Mario", archetype: "Fruit Case Trend", caption: "girl math: it cost less than my coffee habit 😩 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-20", slot: "7pm", platform: "TikTok", product: "Wavy", archetype: "Didn't Know This Existed", caption: "ok the secret is out 💕 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-21", slot: "7am", platform: "TikTok", product: "Bow Diamond", archetype: "IT Girl Phone Check", caption: "which case = ur red flag 😭 #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-21", slot: "11am", platform: "Both", product: "Dachshund", archetype: "PR Package Haul", caption: "the case completes the setup 🎀 #casekisses #phonesetup", sound: "", videoPrompt: "" },
-    { date: "2026-06-21", slot: "7pm", platform: "TikTok", product: "Butter Bear", archetype: "Hand Covers Camera Transition", caption: "duet me ur case + name her 🎀 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-22", slot: "7am", platform: "TikTok", product: "Puppy", archetype: "Canadian Small Business", caption: "ribbon untie + tissue rustle ✨ #casekisses #unboxingasmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-22", slot: "11am", platform: "Instagram", product: "Hello Kitty Cherry", archetype: "Small Business BTS", caption: "ok this is what closure feels like 😭 #casekisses #phonecasecheck", sound: "", videoPrompt: "" },
-    { date: "2026-06-22", slot: "7pm", platform: "TikTok", product: "Bow Cherry", archetype: "Founder Story", caption: "color coordinated even her case 💕 #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-23", slot: "7am", platform: "TikTok", product: "Cherry", archetype: "Which One Matches Your Vibe", caption: "girl math: ÷ by years of use = 10¢ a day 🎀 #casekisses #girlmath", sound: "", videoPrompt: "" },
-    { date: "2026-06-23", slot: "11am", platform: "Both", product: "Burger", archetype: "Stitch Bait", caption: "no more hiding her from you 🎀 #casekisses #notgatekeeping", sound: "", videoPrompt: "" },
-    { date: "2026-06-23", slot: "7pm", platform: "TikTok", product: "Mario", archetype: "Outfit Swap Transition", caption: "pick your case based on ur fav drink ☕️ #casekisses #whichoneareyou", sound: "", videoPrompt: "" },
-    { date: "2026-06-24", slot: "7am", platform: "TikTok", product: "Wavy", archetype: "Girl Math Comedy", caption: "rate my pink office vibe 📱 #casekisses #deskaesthetic", sound: "", videoPrompt: "" },
-    { date: "2026-06-24", slot: "11am", platform: "Both", product: "Bow Diamond", archetype: "Unboxing Surprise Gift", caption: "stitch ur 'i bought it' moment 😩 #casekisses #stitchbait", sound: "", videoPrompt: "" },
-    { date: "2026-06-24", slot: "7pm", platform: "TikTok", product: "Dachshund", archetype: "Should Be Illegal Hook", caption: "scissor snip ASMR 8hr loop ✂️ #casekisses #asmr", sound: "", videoPrompt: "" },
-    { date: "2026-06-25", slot: "7am", platform: "TikTok", product: "Butter Bear", archetype: "Satisfying Loop Click", caption: "phone was crying for help 🥺 #casekisses #beforeandafter", sound: "", videoPrompt: "" },
-    { date: "2026-06-25", slot: "11am", platform: "Both", product: "Puppy", archetype: "Compliment Magnet", caption: "pov: ur whole vibe matches the case ✨ #casekisses #ootd", sound: "", videoPrompt: "" },
-    { date: "2026-06-25", slot: "7pm", platform: "TikTok", product: "Hello Kitty Cherry", archetype: "Falling Phone Transition", caption: "girl math: ur phone deserves nice things 💕 #casekisses #girlmath", sound: "", videoPrompt: "" }
-  ];
-
   var data = {};
   var weekStart = startOfWeek(new Date());
   var formKey = null;
   var detailKey = null;
 
   // ---------- seed ----------
-  // Versioned gate: runs once per version. v12 renames `videoFile` to
-  // `videoFilePath` on every existing entry — the slot ID is now the identifier
-  // the user types as their Higgsfield export filename, while videoFilePath
-  // points at whatever local file they attach (multiple slots may reuse the
-  // same file). For existing slots, also syncs archetype + preset and
-  // back-fills an empty videoPrompt with the default template prompt —
-  // user-written prompts are never overwritten. Empty slots get a full SEED
-  // insert with preset + rendered videoPrompt.
+  // Versioned gate: bumps to ck_calendar_seeded_v17 trigger a full reseed.
+  // The seed is generated procedurally from COMBO_COUNTS — every (case,
+  // concept) combo must appear in the strict matcher's list, and the
+  // per-case counts track how many actual video files exist on disk for
+  // that case (so Auto-Match can fill every slot). Storage is wiped on
+  // reseed because stale combos from earlier versions would fail the
+  // strict matcher.
   function seedPlan() {
     var seeded;
-    try { seeded = localStorage.getItem("ck_calendar_seeded_v14"); } catch (e) { return; }
+    try { seeded = localStorage.getItem("ck_calendar_seeded_v17"); } catch (e) { return; }
     if (seeded != null) return;
 
-    var existing = {};
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      var parsed = raw ? JSON.parse(raw) : {};
-      if (parsed && typeof parsed === "object") existing = parsed;
-    } catch (e) { /* ignore */ }
+    // (case, concept) recipe. Per-case totals are tuned to the video
+    // library: e.g. Butter Bear has 9 files so it gets 18 slots; Wavy
+    // has 1 file so it gets 2.
+    var COMBO_COUNTS = [
+      { product: "Bow Black",   archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Bow Cherry",  archetype: "ASMR Unboxing",                count: 3 },
+      { product: "Bow Cherry",  archetype: "Small Business BTS",           count: 3 },
+      { product: "Bow Cherry",  archetype: "IT Girl Phone Check",          count: 4 },
+      { product: "Bow Diamond", archetype: "ASMR Unboxing",                count: 3 },
+      { product: "Bow Diamond", archetype: "Small Business BTS",           count: 2 },
+      { product: "Bow Diamond", archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Bow Diamond", archetype: "Influencer Ranking Haul",      count: 2 },
+      { product: "Burger",      archetype: "Before/After Ugly Case",       count: 3 },
+      { product: "Burger",      archetype: "Small Business BTS",           count: 2 },
+      { product: "Burger",      archetype: "GRWM Morning Routine",         count: 3 },
+      { product: "Butter Bear", archetype: "ASMR Unboxing",                count: 4 },
+      { product: "Butter Bear", archetype: "Didn't Know This Existed",     count: 4 },
+      { product: "Butter Bear", archetype: "Founder Story",                count: 2 },
+      { product: "Butter Bear", archetype: "IT Girl Phone Check",          count: 4 },
+      { product: "Butter Bear", archetype: "Satisfying Loop Click",        count: 4 },
+      { product: "Cherry",      archetype: "ASMR Unboxing",                count: 3 },
+      { product: "Cherry",      archetype: "Fruit Case Trend",             count: 2 },
+      { product: "Cherry",      archetype: "GRWM Morning Routine",         count: 3 },
+      { product: "Dachshund",   archetype: "Founder Story",                count: 3 },
+      { product: "Dachshund",   archetype: "Cases I've Been Gatekeeping",  count: 6 },
+      { product: "Dachshund",   archetype: "Should Be Illegal Hook",       count: 3 },
+      { product: "Mario",       archetype: "Before/After Ugly Case",       count: 3 },
+      { product: "Mario",       archetype: "My Boyfriend Hates It",        count: 3 },
+      { product: "Mario",       archetype: "IT Girl Phone Check",          count: 4 },
+      { product: "Puppy",       archetype: "IT Girl Phone Check",          count: 3 },
+      { product: "Wavy",        archetype: "POV Outfit Match",             count: 2 }
+    ];
 
-    // v12 migration: rename legacy videoFile → videoFilePath. The old field
-    // stored only the basename, so existing values are carried over verbatim.
-    Object.keys(existing).forEach(function (k) {
-      var cur = existing[k];
-      if (!cur || typeof cur !== "object") return;
-      if (cur.videoFilePath == null && cur.videoFile) {
-        cur.videoFilePath = cur.videoFile;
+    // One caption per archetype: lowercase, punchy, emoji + #casekisses +
+    // one niche hashtag.
+    var CAPTIONS = {
+      "ASMR Unboxing":                "the pink box opens different 📦🎀 #casekisses #asmrunboxing",
+      "Before/After Ugly Case":       "from ugly to obsessed in 3 seconds ✨ #casekisses #glowup",
+      "POV Outfit Match":             "when your case matches the fit 🎯💕 #casekisses #outfitmatch",
+      "Cases I've Been Gatekeeping":  "not gatekeeping these anymore 😩 #casekisses #gatekeeping",
+      "GRWM Morning Routine":         "grwm + casing my phone with me ☀️🎀 #casekisses #grwm",
+      "Satisfying Loop Click":        "the click hits different 🔁✨ #casekisses #satisfying",
+      "Small Business BTS":           "packing pink boxes all day 📦💼 #casekisses #smallbusiness",
+      "Fruit Case Trend":             "cherry girl era 🍒💕 #casekisses #fruitcase",
+      "My Boyfriend Hates It":        "he says it's too much 💁‍♀️ no notes #casekisses #bfhatesit",
+      "IT Girl Phone Check":          "it girl phone check 📱✨ #casekisses #itgirl",
+      "Influencer Ranking Haul":      "ranking the cases 1-10 🏆🎀 #casekisses #ranking",
+      "Should Be Illegal Hook":       "this case should be illegal 🚨🎀 #casekisses #illegallycute",
+      "Founder Story":                "the story behind case kisses 🥹🎀 #casekisses #founderstory",
+      "Didn't Know This Existed":     "didn't know this existed until now 🤯💕 #casekisses #didntknow"
+    };
+
+    // Group each case into a queue, interleaving its archetypes round-
+    // robin so successive draws of the same case rotate through its
+    // available archetypes instead of front-loading one.
+    var byCase = {};
+    COMBO_COUNTS.forEach(function (c) {
+      if (!byCase[c.product]) byCase[c.product] = { groups: {} };
+      byCase[c.product].groups[c.archetype] =
+        (byCase[c.product].groups[c.archetype] || 0) + c.count;
+    });
+    Object.keys(byCase).forEach(function (caseName) {
+      var groups = byCase[caseName].groups;
+      var archetypes = Object.keys(groups);
+      var totalLen = 0;
+      archetypes.forEach(function (a) { totalLen += groups[a]; });
+      var queue = [];
+      while (queue.length < totalLen) {
+        archetypes.forEach(function (a) {
+          if (groups[a] > 0) { queue.push(a); groups[a]--; }
+        });
       }
-      delete cur.videoFile;
+      byCase[caseName] = queue;
     });
 
+    // Greedy distribution across 28 days × 3 slots. Each slot picks the
+    // case with the most remaining items, excluding the previous slot's
+    // case on this day so no two consecutive slots share a case. Tested
+    // to fill all 84 slots with zero violations given the COMBO_COUNTS
+    // above; verify-on-bump if you change the recipe.
+    var SLOT_IDS = ["7am", "11am", "7pm"];
+    var PLATFORM_BY_SLOT = { "7am": "TikTok", "11am": "Both", "7pm": "TikTok" };
+    var SEED = [];
+    for (var d = 0; d < 28; d++) {
+      var date = "2026-06-" + String(d + 1).padStart(2, "0");
+      var lastCase = null;
+      for (var s = 0; s < SLOT_IDS.length; s++) {
+        var bestCase = null, bestN = -1;
+        Object.keys(byCase).forEach(function (c) {
+          if (byCase[c].length === 0 || c === lastCase) return;
+          if (byCase[c].length > bestN) { bestN = byCase[c].length; bestCase = c; }
+        });
+        if (bestCase === null) {
+          Object.keys(byCase).forEach(function (c) {
+            if (byCase[c].length === 0) return;
+            if (byCase[c].length > bestN) { bestN = byCase[c].length; bestCase = c; }
+          });
+        }
+        if (bestCase === null) break;
+        var archetype = byCase[bestCase].shift();
+        SEED.push({
+          date: date,
+          slot: SLOT_IDS[s],
+          platform: PLATFORM_BY_SLOT[SLOT_IDS[s]],
+          product: bestCase,
+          archetype: archetype,
+          caption: CAPTIONS[archetype] || ""
+        });
+        lastCase = bestCase;
+      }
+    }
+
+    // Wipe and write: every slot must use an approved combo, so stale
+    // entries from earlier seed versions are discarded outright.
+    var fresh = {};
     SEED.forEach(function (s) {
       var key = s.date + "__" + s.slot;
-      var preset = presetFor(s.archetype);
-      var prompt = defaultPromptFor(s.archetype, s.product);
-      var cur = existing[key];
-      if (cur) {
-        cur.archetype = s.archetype;
-        cur.preset = preset;
-        if (!cur.videoPrompt) cur.videoPrompt = prompt;
-      } else {
-        existing[key] = {
-          id: "c_" + Math.random().toString(36).slice(2, 10),
-          platform: s.platform,
-          product: s.product,
-          archetype: s.archetype,
-          preset: preset,
-          caption: s.caption,
-          sound: s.sound,
-          videoPrompt: prompt,
-          status: "planned",
-          createdAt: Date.now()
-        };
-      }
+      fresh[key] = {
+        id: "c_" + Math.random().toString(36).slice(2, 10),
+        platform: s.platform,
+        product: s.product,
+        archetype: s.archetype,
+        preset: presetFor(s.archetype),
+        caption: s.caption,
+        sound: "",
+        soundSource: "tiktok",
+        videoPrompt: "",
+        status: "planned",
+        createdAt: Date.now()
+      };
     });
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(existing)); } catch (e) { /* ignore */ }
-    try { localStorage.setItem("ck_calendar_seeded_v14", "1"); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem("ck_calendar_seeded_v17", "1"); } catch (e) { /* ignore */ }
   }
 
   // ---------- storage ----------
