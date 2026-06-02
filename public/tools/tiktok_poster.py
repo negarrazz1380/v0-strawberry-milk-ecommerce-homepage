@@ -676,8 +676,8 @@ def main():
     print("STEP 2: Open Terminal and run this command:")
     print("/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222")
     print("STEP 3: Chrome will open — log into TikTok Studio (studio.tiktok.com)")
-    print("STEP 4: Come back here and press Enter")
-    input()
+    print("STEP 4: Continuing automatically in 2 seconds...")
+    time.sleep(2)
 
     queue = load_queue()
     if not queue:
