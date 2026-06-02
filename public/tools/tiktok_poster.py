@@ -719,7 +719,7 @@ def main():
         time_str = item.get("scheduleTime", "?")
         video_file = item.get("videoFile", "")
         if not video_file:
-            print(f"❌ MISSING: {date} {time_str} → (no videoFile in queue)")
+            print(f"❌ NO VIDEO: {date} {time_str}")
             missing.append(item)
             continue
         video_path = VIDEO_DIR / video_file
@@ -790,11 +790,11 @@ def main():
             f"{it.get('platform')}: {it.get('product')} + {it.get('archetype')}"
         )
     if missing:
-        print(f"\n⚠️  Missing video file: {len(missing)}")
+        print(f"\n⚠️  Missing or no videoFile: {len(missing)}")
         for it in missing:
+            label = it.get("videoFile") or "(no videoFile)"
             print(
-                f"   - {it.get('scheduleDate')} {it.get('scheduleTime')}: "
-                f"{it.get('videoFile') or '(no videoFile in queue)'}"
+                f"   - {it.get('scheduleDate')} {it.get('scheduleTime')}: {label}"
             )
     if failed:
         print(f"\n❌ Failed: {len(failed)}")
