@@ -147,7 +147,7 @@ export default async function ProductPage({ params }: Props) {
     offers: {
       '@type': 'Offer',
       price: product.price.toFixed(2),
-      priceCurrency: 'USD',
+      priceCurrency: 'CAD',
       availability: isInStock
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
@@ -163,7 +163,7 @@ export default async function ProductPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ProductPageClient productId={product.id} />
+      <ProductPageClient product={product} />
     </>
   )
 }

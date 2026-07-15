@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/hooks/use-cart'
 import Link from 'next/link'
 import { ArrowLeft, ShoppingBag } from 'lucide-react'
@@ -11,86 +9,38 @@ interface Product {
   id: string
   name: string
   price: number
-  image_url: string
-  description: string
+  image_url: string | null
+  description: string | null
   device_models?: string[] | null
   stock: number
 }
 
 interface ProductPageClientProps {
-  productId: string
+  /**
+   * The product is fetched on the SERVER in page.tsx and passed in here.
+   *
+   * Do NOT re-fetch it on the client. Client-side fetching leaves the product
+   * name, price and description out of the initial HTML, which makes this page
+   * look empty to crawlers that don't run JavaScript (OAI-SearchBot / ChatGPT,
+   * BingBot, etc.) and kills our search + AI visibility.
+   */
+  product: Product
 }
 
-export function ProductPageClient({ productId }: ProductPageClientProps) {
-  const router = useRouter()
+export function ProductPageClient({ product }: ProductPageClientProps) {
   const { addItem } = useCart()
-  const [product, setProduct] = useState<Product | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
 
+  // Analytics only — runs after hydration and never gates what gets rendered.
   useEffect(() => {
-    const fetchProduct = async () => {
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .single()
-
-      if (error) {
-        console.error('Product fetch error:', error.message, error.code)
-        setError('Product not found')
-        setLoading(false)
-        return
-      }
-
-      setProduct(data)
-      setLoading(false)
-
-      window.ttq?.track('ViewContent', {
-        contents: [{ content_id: data.id, content_name: data.name }],
-        content_type: 'product',
-        value: data.price,
-        currency: 'CAD',
-      })
-    }
-
-    fetchProduct()
-  }, [productId])
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div className="aspect-square bg-white/50 rounded-3xl animate-pulse" />
-          <div className="space-y-4">
-            <div className="h-8 bg-white/50 rounded-lg w-3/4 animate-pulse" />
-            <div className="h-12 bg-white/50 rounded-lg w-1/2 animate-pulse" />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !product) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
-          <p className="text-lg text-foreground/60 mb-6">{error || 'Product not found'}</p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium"
-          >
-            <ArrowLeft size={20} />
-            Back to shop
-          </Link>
-        </div>
-      </div>
-    )
-  }
+    window.ttq?.track('ViewContent', {
+      contents: [{ content_id: product.id, content_name: product.name }],
+      content_type: 'product',
+      value: product.price,
+      currency: 'CAD',
+    })
+  }, [product.id, product.name, product.price])
 
   return (
     <main>

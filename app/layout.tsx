@@ -61,6 +61,39 @@ export const metadata: Metadata = {
   },
 }
 
+/**
+ * Organization + WebSite structured data.
+ *
+ * This is what tells Google AND AI engines (ChatGPT/Bing) that CaseKisses is a
+ * single, real, identifiable brand rather than a random store. `sameAs` ties all
+ * our profiles into one entity — keep this list accurate and add new profiles.
+ */
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': 'https://www.casekisses.com/#organization',
+  name: 'CaseKisses',
+  url: 'https://www.casekisses.com',
+  logo: 'https://www.casekisses.com/images/casekiss-logo.png',
+  description:
+    'CaseKisses is a cute, coquette-aesthetic phone case brand — bows, cherries, and pastel designs for iPhone.',
+  slogan: 'Cute phone cases for cute prices.',
+  // TODO: replace with the real profile URLs (and add Pinterest once created).
+  sameAs: [
+    'https://www.tiktok.com/@casekisses',
+    'https://www.instagram.com/casekisses',
+  ],
+}
+
+const webSiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': 'https://www.casekisses.com/#website',
+  name: 'CaseKisses',
+  url: 'https://www.casekisses.com',
+  publisher: { '@id': 'https://www.casekisses.com/#organization' },
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -69,6 +102,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable} ${sarina.variable} ${dancingScript.variable} ${playfairDisplay.variable} bg-background`}>
       <body className="font-sans antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+        />
         <TiktokPixel />
         {children}
         <CartDrawer />

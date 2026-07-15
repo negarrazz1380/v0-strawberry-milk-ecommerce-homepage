@@ -99,8 +99,35 @@ export default function FAQPage() {
     setOpenIndex(openIndex === index ? null : index)
   }
 
+  /**
+   * FAQPage structured data.
+   *
+   * The visible answers only render once an accordion is opened, so crawlers
+   * that don't run JavaScript never see them. This JSON-LD ships every Q&A in
+   * the initial HTML so Google and AI engines (ChatGPT/Bing) can read and cite
+   * our answers. Keep it generated from the `faqs` array so the two can't drift.
+   */
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.flatMap((section) =>
+      section.items.map((faq) => ({
+        '@type': 'Question',
+        name: faq.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.a,
+        },
+      }))
+    ),
+  }
+
   return (
     <main className="relative">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Header />
       
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
