@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { createClient } from '@/lib/supabase/server'
 import { getModelDisplayName } from '@/lib/iphone-models'
 import { IPhoneModelPageClient } from './IPhoneModelPageClient'
 
@@ -45,7 +46,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+/**
+ * Fetches the cases that fit a given iPhone model — on the SERVER.
+ *
+ * This runs at request time so the product grid is present in the initial HTML.
+ * Do NOT move this back into the client component: crawlers that don't run
+ * JavaScript (OAI-SearchBot / ChatGPT, BingBot) would see an empty page.
+ */
+async function fetchProductsForModel(model: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(
+      'id, slug, name, price, image_url, description, category, device_models, stock, sales_count, is_best_seller'
+    )
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching products for model:', error.message)
+    return []
+  }
+
+  const modelDisplayName = getModelDisplayName(model)
+
+  return (data || []).filter((product) =>
+    (product.device_models || []).includes(modelDisplayName)
+  )
+}
+
 export default async function IPhoneModelPage({ params }: Props) {
   const { model } = await params
-  return <IPhoneModelPageClient model={model} />
+  const products = await fetchProductsForModel(model)
+
+  return <IPhoneModelPageClient model={model} products={products} />
 }
