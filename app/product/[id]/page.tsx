@@ -19,6 +19,7 @@ interface Product {
   description: string | null
   price: number
   image_url: string | null
+  image_alt: string | null
   category: string | null
   device_models: string[] | null
   stock: number
@@ -36,7 +37,7 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   if (isUUID(idOrSlug)) {
     const { data } = await supabase
       .from('products')
-      .select('id, slug, name, description, price, image_url, category, device_models, stock')
+      .select('id, slug, name, description, price, image_url, image_alt, category, device_models, stock')
       .eq('id', idOrSlug)
       .single()
     return data ?? null
@@ -45,7 +46,7 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   // Treat as slug
   const { data } = await supabase
     .from('products')
-    .select('id, slug, name, description, price, image_url, category, device_models, stock')
+    .select('id, slug, name, description, price, image_url, image_alt, category, device_models, stock')
     .eq('slug', idOrSlug)
     .single()
   return data ?? null
@@ -140,12 +141,32 @@ export default async function ProductPage({ params }: Props) {
   // AggregateRating schema below are in the initial HTML.
   const reviewData = await fetchProductReviews(product.id)
 
+  /**
+   * Product image as a full ImageObject rather than a bare URL string.
+   *
+   * Schema is how AI engines confirm what an image shows — roughly 65-71% of
+   * pages cited by AI search carry structured data. The `caption` mirrors the
+   * visible alt text on purpose: when the explicit description and the vision
+   * model's own read agree, confidence (and citation odds) go up.
+   */
+  const imageAlt = product.image_alt || product.name
+  const imageObject = product.image_url
+    ? {
+        '@type': 'ImageObject',
+        contentUrl: product.image_url,
+        url: product.image_url,
+        caption: imageAlt,
+        description: imageAlt,
+        representativeOfPage: true,
+      }
+    : undefined
+
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
     description: product.description || '',
-    image: product.image_url || '',
+    image: imageObject ? [imageObject] : [],
     sku: product.id,
     brand: { '@type': 'Brand', name: 'CaseKisses' },
     category: product.category || 'Phone Cases',

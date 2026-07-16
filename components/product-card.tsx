@@ -9,6 +9,7 @@ interface Product {
   name: string
   price: number
   image_url: string
+  image_alt?: string | null
   stock: number
   sales_count?: number
   is_best_seller?: boolean
@@ -30,7 +31,11 @@ export function ProductCard({ product }: ProductCardProps) {
           {product.image_url ? (
             <img
               src={product.image_url}
-              alt={product.name}
+              /* Alt text is what AI crawlers actually read to understand the
+                 image. Prefer the product's own written description of the
+                 photo; fall back to the name only when none exists yet. */
+              alt={product.image_alt || product.name}
+              loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (

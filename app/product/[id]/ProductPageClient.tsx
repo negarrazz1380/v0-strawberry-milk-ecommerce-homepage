@@ -11,6 +11,7 @@ interface Product {
   name: string
   price: number
   image_url: string | null
+  image_alt?: string | null
   description: string | null
   device_models?: string[] | null
   stock: number
@@ -69,7 +70,7 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
             {product.image_url ? (
               <img
                 src={product.image_url}
-                alt={product.name}
+                alt={product.image_alt || product.name}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -179,7 +180,7 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
             {/* Additional Info */}
             <div className="border-t border-border/50 pt-6">
               <p className="text-xs text-foreground/50">
-                Free shipping on orders over $35
+                Free standard shipping to Canada and the USA
               </p>
             </div>
           </div>
