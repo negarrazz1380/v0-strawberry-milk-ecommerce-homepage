@@ -1,7 +1,4 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import { ProductCard } from '@/components/product-card'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -19,48 +16,25 @@ interface Product {
   is_best_seller: boolean
 }
 
-export default function BestSellersPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+/**
+ * Server component — fetched on the server so the grid is in the initial HTML.
+ * Do NOT convert back to a 'use client' + useEffect fetch: crawlers that don't
+ * run JavaScript would see an empty page.
+ */
+export default async function BestSellersPage() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .eq('is_best_seller', true)
+    .order('sales_count', { ascending: false })
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const supabase = createClient()
-      const query = supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_best_seller', true)
-        .order('sales_count', { ascending: false })
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching best sellers:', error)
-        setLoading(false)
-        return
-      }
-
-      setProducts(data || [])
-      setLoading(false)
-    }
-
-    fetchProducts()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white/50 rounded-3xl h-80 animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+  if (error) {
+    console.error('Error fetching best sellers:', error.message)
   }
+
+  const products: Product[] = data ?? []
 
   return (
     <div className="min-h-screen pt-20">

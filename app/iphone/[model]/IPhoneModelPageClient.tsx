@@ -1,5 +1,7 @@
 'use client'
 
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 import { ProductCard } from '@/components/product-card'
 import { getModelDisplayName } from '@/lib/iphone-models'
 import Link from 'next/link'
@@ -36,6 +38,7 @@ export function IPhoneModelPageClient({ model, products }: Props) {
 
   return (
     <div className="min-h-screen pt-20">
+      <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/iphone" className="p-2 hover:bg-accent rounded-full transition-colors">
@@ -58,6 +61,7 @@ export function IPhoneModelPageClient({ model, products }: Props) {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   )
 }

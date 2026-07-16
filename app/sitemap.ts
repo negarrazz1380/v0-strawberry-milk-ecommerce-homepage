@@ -9,9 +9,6 @@ export const revalidate = 3600 // re-fetch products every hour at most
 
 const BASE_URL = 'https://www.casekisses.com'
 
-// iPhone 17 models are excluded until active products exist for those models
-const EXCLUDED_MODEL_SLUGS = new Set(['iphone_17', 'iphone_17_pro', 'iphone_17_pro_max'])
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch products using shared helper — same logic as debug route
   const { products, error } = await fetchSitemapProducts()
@@ -29,7 +26,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  // iPhone collection page + model pages (excluding iPhone 17 until products exist)
+  /**
+   * Which iPhone models do we actually sell cases for right now?
+   *
+   * This is derived from live product data rather than a hardcoded list, so a
+   * model page is listed the moment a product is tagged for it — and dropped
+   * again if the last product for it goes inactive. A hardcoded exclusion list
+   * silently goes stale and hides real pages from crawlers.
+   */
+  const modelsWithProducts = new Set(
+    products.flatMap((product) => product.device_models ?? [])
+  )
+
   const deviceUrls: MetadataRoute.Sitemap = [
     {
       url: `${BASE_URL}/iphone`,
@@ -37,9 +45,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: 0.85,
     },
-    ...Object.keys(IPHONE_MODELS_MAP)
-      .filter((slug) => !EXCLUDED_MODEL_SLUGS.has(slug))
-      .map((slug) => ({
+    ...Object.entries(IPHONE_MODELS_MAP)
+      .filter(([, displayName]) => modelsWithProducts.has(displayName))
+      .map(([slug]) => ({
         url: `${BASE_URL}/iphone/${slug}`,
         lastModified: new Date(),
         changeFrequency: 'weekly' as const,
@@ -51,6 +59,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticUrls: MetadataRoute.Sitemap = [
     { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
     { url: `${BASE_URL}/shop-all`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${BASE_URL}/category/iphone`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
+    { url: `${BASE_URL}/category/airpods`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${BASE_URL}/category/accessories`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE_URL}/shop/best-sellers`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
     { url: `${BASE_URL}/shop/last-chance`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
     { url: `${BASE_URL}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },

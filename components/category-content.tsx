@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ProductCard } from '@/components/product-card'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -23,75 +22,36 @@ interface Product {
 
 interface CategoryContentProps {
   category: string
+  /**
+   * Products are fetched on the SERVER in page.tsx and passed in here.
+   *
+   * The device filter below is client-side (it needs interactivity), but the
+   * DATA must arrive as a prop. Re-fetching in useEffect would leave the grid
+   * out of the initial HTML and hide the catalogue from non-JS crawlers.
+   */
+  products: Product[]
 }
 
-export function CategoryContent({ category }: CategoryContentProps) {
+export function CategoryContent({ category, products }: CategoryContentProps) {
   const searchParams = useSearchParams()
   const deviceParam = searchParams.get('device')
-  const [products, setProducts] = useState<Product[]>([])
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
-  const [devices, setDevices] = useState<string[]>([])
   const [selectedDevice, setSelectedDevice] = useState<string>(deviceParam || 'all')
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', category)
-        .eq('is_active', true)
-        .order('sales_count', { ascending: false })
+  const devices =
+    category === 'iphone' || category === 'airpods'
+      ? ([...new Set(products.flatMap((p) => p.device_models || []))].filter(
+          Boolean
+        ) as string[])
+      : []
 
-      if (error) {
-        console.error('Error fetching products:', error)
-        setLoading(false)
-        return
-      }
-
-      const productsData = data || []
-      setProducts(productsData)
-
-      if (category === 'iphone' || category === 'airpods') {
-        // Extract unique device models from all products
-        const uniqueDevices = [...new Set(productsData.flatMap(p => p.device_models || []))]
-        setDevices(uniqueDevices.filter(Boolean) as string[])
-      }
-
-      setFilteredProducts(productsData)
-      setLoading(false)
-    }
-
-    fetchProducts()
-  }, [category])
-
-  useEffect(() => {
-    if (selectedDevice === 'all') {
-      setFilteredProducts(products)
-    } else {
-      // Filter products where device_models array contains the selected device
-      setFilteredProducts(products.filter(p => p.device_models?.includes(selectedDevice)))
-    }
-  }, [selectedDevice, products])
+  const filteredProducts =
+    selectedDevice === 'all'
+      ? products
+      : products.filter((p) => p.device_models?.includes(selectedDevice))
 
   const categoryTitle =
     { iphone: 'iPhone', airpods: 'AirPods', accessories: 'Accessories' }[category] ||
     category.charAt(0).toUpperCase() + category.slice(1)
-
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white/50 rounded-3xl h-80 animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen pt-20">

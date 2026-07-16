@@ -1,7 +1,4 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import { ProductCard } from '@/components/product-card'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -20,45 +17,25 @@ interface Product {
   is_best_seller: boolean
 }
 
-export default function ShopAllPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+/**
+ * Server component — products are fetched on the server so the grid is in the
+ * initial HTML. Do NOT convert this back to a 'use client' + useEffect fetch:
+ * crawlers that don't run JavaScript (OAI-SearchBot / ChatGPT, BingBot) would
+ * see an empty page instead of our catalogue.
+ */
+export default async function ShopAllPage() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching products:', error)
-        setLoading(false)
-        return
-      }
-
-      setProducts(data || [])
-      setLoading(false)
-    }
-
-    fetchProducts()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white/50 rounded-3xl h-80 animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+  if (error) {
+    console.error('Error fetching products:', error.message)
   }
+
+  const products: Product[] = data ?? []
 
   return (
     <div className="min-h-screen pt-20">

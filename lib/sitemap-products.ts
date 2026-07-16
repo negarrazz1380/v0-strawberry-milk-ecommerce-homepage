@@ -7,6 +7,7 @@ export interface FetchProductsResult {
     slug: string | null
     is_active: boolean
     created_at: string | null
+    device_models: string[] | null
   }>
   error: Error | null
 }
@@ -31,7 +32,7 @@ export async function fetchSitemapProducts(): Promise<FetchProductsResult> {
 
   const { data, error: dbError } = await supabase
     .from('products')
-    .select('id, name, slug, is_active, created_at')
+    .select('id, name, slug, is_active, created_at, device_models')
     .eq('is_active', true)
 
   if (dbError) {

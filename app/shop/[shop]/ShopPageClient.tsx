@@ -1,7 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { ProductCard } from '@/components/product-card'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -23,59 +21,16 @@ interface Product {
 interface ShopPageClientProps {
   shop: string
   title: string
+  /**
+   * Products are fetched on the SERVER in page.tsx and passed in here.
+   *
+   * Do NOT re-fetch them on the client — that leaves the grid out of the
+   * initial HTML and hides the catalogue from non-JS crawlers.
+   */
+  products: Product[]
 }
 
-export function ShopPageClient({ shop, title }: ShopPageClientProps) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const supabase = createClient()
-      let query = supabase
-        .from('products')
-        .select('id, slug, name, price, image_url, description, category, device_models, stock, sales_count, is_best_seller')
-        .eq('is_active', true)
-
-      if (shop === 'best-sellers') {
-        query = query.eq('is_best_seller', true).order('sales_count', { ascending: false })
-      } else if (shop === 'last-chance') {
-        query = query
-          .lt('stock', 6)
-          .gt('stock', 0)
-          .order('stock', { ascending: true })
-      } else if (shop === 'all') {
-        query = query.order('created_at', { ascending: false })
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching products:', error)
-        setLoading(false)
-        return
-      }
-
-      setProducts(data || [])
-      setLoading(false)
-    }
-
-    fetchProducts()
-  }, [shop])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white/50 rounded-3xl h-80 animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+export function ShopPageClient({ shop, title, products }: ShopPageClientProps) {
 
   return (
     <div className="min-h-screen pt-20">

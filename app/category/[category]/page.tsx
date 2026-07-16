@@ -1,5 +1,31 @@
 import { Suspense } from 'react'
+import { createClient } from '@/lib/supabase/server'
 import { CategoryContent } from '@/components/category-content'
+
+/**
+ * Fetches a category's products — on the SERVER.
+ *
+ * Runs at request time so the grid ships in the initial HTML. The device filter
+ * stays client-side, but the data must not: crawlers that don't run JavaScript
+ * (OAI-SearchBot / ChatGPT, BingBot) would otherwise see an empty category.
+ */
+async function fetchCategoryProducts(category: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('category', category)
+    .eq('is_active', true)
+    .order('sales_count', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching category products:', error.message)
+    return []
+  }
+
+  return data ?? []
+}
 
 export default async function CategoryPage({
   params,
@@ -7,6 +33,7 @@ export default async function CategoryPage({
   params: Promise<{ category: string }>
 }) {
   const { category } = await params
+  const products = await fetchCategoryProducts(category)
 
   return (
     <Suspense
@@ -22,7 +49,7 @@ export default async function CategoryPage({
         </div>
       }
     >
-      <CategoryContent category={category} />
+      <CategoryContent category={category} products={products} />
     </Suspense>
   )
 }
