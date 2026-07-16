@@ -171,6 +171,21 @@ export default async function ProductPage({ params }: Props) {
     brand: { '@type': 'Brand', name: 'CaseKisses' },
     category: product.category || 'Phone Cases',
     url: canonicalUrl,
+    /**
+     * Explicit entity links to the devices this case fits.
+     *
+     * This is what lets an AI answer "cute iPhone 15 case" with THIS product
+     * instead of guessing from prose. Generated from device_models, so it stays
+     * true automatically — never hardcode it.
+     */
+    ...(product.device_models && product.device_models.length > 0
+      ? {
+          isAccessoryOrSparePartFor: product.device_models.map((model) => ({
+            '@type': 'Product',
+            name: model,
+          })),
+        }
+      : {}),
     offers: {
       '@type': 'Offer',
       price: product.price.toFixed(2),
@@ -181,6 +196,48 @@ export default async function ProductPage({ params }: Props) {
       itemCondition: 'https://schema.org/NewCondition',
       url: canonicalUrl,
       seller: { '@type': 'Organization', name: 'CaseKisses' },
+      /**
+       * Shipping + returns as structured data.
+       *
+       * These must match lib/shipping.ts and app/returns/page.tsx exactly — AI
+       * reads this as fact and will state it back to shoppers.
+       */
+      shippingDetails: {
+        '@type': 'OfferShippingDetails',
+        shippingRate: {
+          '@type': 'MonetaryAmount',
+          value: '0',
+          currency: 'CAD',
+        },
+        shippingDestination: [
+          { '@type': 'DefinedRegion', addressCountry: 'CA' },
+          { '@type': 'DefinedRegion', addressCountry: 'US' },
+        ],
+        deliveryTime: {
+          '@type': 'ShippingDeliveryTime',
+          handlingTime: {
+            '@type': 'QuantitativeValue',
+            minValue: 1,
+            maxValue: 3,
+            unitCode: 'DAY',
+          },
+          transitTime: {
+            '@type': 'QuantitativeValue',
+            minValue: 5,
+            maxValue: 10,
+            unitCode: 'DAY',
+          },
+        },
+      },
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: ['CA', 'US'],
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: 14,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        returnFees: 'https://schema.org/ReturnShippingFees',
+        refundType: 'https://schema.org/StoreCreditRefund',
+      },
     },
   }
 
