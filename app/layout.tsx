@@ -78,10 +78,11 @@ const organizationJsonLd = {
   description:
     'CaseKisses is a cute, coquette-aesthetic phone case brand — bows, cherries, and pastel designs for iPhone.',
   slogan: 'Cute phone cases for cute prices.',
-  // TODO: replace with the real profile URLs (and add Pinterest once created).
+  // Only list profiles we actually own. A wrong URL here tells Google and AI
+  // that someone else's account is us — worse than listing nothing.
+  // TODO: add the real Instagram URL, and Pinterest once that account exists.
   sameAs: [
     'https://www.tiktok.com/@casekisses',
-    'https://www.instagram.com/casekisses',
   ],
 }
 

@@ -14,11 +14,11 @@ export default function FAQPage() {
       items: [
         {
           q: "How long does shipping take?",
-          a: "Orders ship within 1-2 business days. Standard shipping takes 5-7 business days, and express shipping takes 2-3 business days. You'll receive a tracking number once your order ships."
+          a: "All orders are processed within 1–3 business days. Delivery to Canada and the USA takes 5–10 business days. You'll receive a tracking number by email once your order ships."
         },
         {
           q: "Do you ship internationally?",
-          a: "Yes! We ship to Canada, the UK, Australia, and select other countries. International orders typically take 10-20 business days. Contact us for rates and availability."
+          a: "We ship across Canada and the USA, with delivery in 5–10 business days. International orders take 7–15 business days — please contact us for rates and availability before ordering."
         },
         {
           q: "Can I change my order after placing it?",
@@ -56,7 +56,7 @@ export default function FAQPage() {
       items: [
         {
           q: "What phone models do you support?",
-          a: "We carry cases for iPhone, Samsung Galaxy, Google Pixel, and more. Check our shop to see all available models and designs."
+          a: "We carry cases for iPhone, from the iPhone 12 series through the iPhone 17 series, plus AirPods cases and accessories. Each product page lists the exact models that case fits."
         },
         {
           q: "Are your cases protective?",
