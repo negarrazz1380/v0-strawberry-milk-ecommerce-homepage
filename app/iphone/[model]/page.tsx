@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { model } = await params
   const modelTitle = getModelDisplayName(model)
   const title = `Cute ${modelTitle} Cases`
-  const description = `Shop cute ${modelTitle} cases from CaseKisses. Find aesthetic, protective, and stylish phone cases with secure checkout and free shipping over $35.`
+  const description = `Shop cute ${modelTitle} cases from CaseKisses. Find aesthetic, protective, and stylish phone cases with secure checkout and free standard shipping to Canada and the USA.`
   const canonicalUrl = `${BASE_URL}/iphone/${model}`
 
   return {

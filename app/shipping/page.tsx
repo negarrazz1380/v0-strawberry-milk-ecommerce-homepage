@@ -57,6 +57,34 @@ export default function ShippingPage() {
             </p>
           </section>
 
+          {/* Shipping Cost */}
+          <section>
+            <h2 className="text-2xl font-serif text-foreground mb-4">Shipping Cost</h2>
+            <div className="space-y-4">
+              <div className="bg-secondary/30 rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2">Canada & USA — Standard</h3>
+                <p className="text-foreground/80 text-base">
+                  <strong className="text-primary">Free</strong> on every order — no minimum
+                </p>
+              </div>
+              <div className="bg-secondary/30 rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2">Canada & USA — Express</h3>
+                <p className="text-foreground/80 text-base">$13</p>
+              </div>
+              <div className="bg-secondary/30 rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2">International — Standard</h3>
+                <p className="text-foreground/80 text-base">$14</p>
+              </div>
+              <div className="bg-secondary/30 rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2">International — Express</h3>
+                <p className="text-foreground/80 text-base">$30</p>
+              </div>
+            </div>
+            <p className="text-foreground/60 text-sm mt-4">
+              Your exact shipping cost is shown at checkout before you pay.
+            </p>
+          </section>
+
           {/* Tracking */}
           <section>
             <h2 className="text-2xl font-serif text-foreground mb-4">Tracking</h2>
