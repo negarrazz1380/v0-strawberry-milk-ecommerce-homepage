@@ -14,11 +14,11 @@ export default function FAQPage() {
       items: [
         {
           q: "How long does shipping take?",
-          a: "All orders are processed within 1–3 business days. Delivery to Canada and the USA takes 5–10 business days. You'll receive a tracking number by email once your order ships."
+          a: "All orders are processed within 1–3 business days. Standard delivery to Canada and the USA takes 5–10 business days, and express delivery takes 2–3 business days. You'll receive a tracking number by email once your order ships."
         },
         {
           q: "Do you ship internationally?",
-          a: "We ship across Canada and the USA, with delivery in 5–10 business days. International orders take 7–15 business days — please contact us for rates and availability before ordering."
+          a: "We ship across Canada and the USA — 5–10 business days standard, or 2–3 business days express. International orders take 7–15 business days — please contact us for rates and availability before ordering."
         },
         {
           q: "Can I change my order after placing it?",

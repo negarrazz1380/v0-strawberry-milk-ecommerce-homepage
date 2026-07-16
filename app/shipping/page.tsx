@@ -34,9 +34,15 @@ export default function ShippingPage() {
             <h2 className="text-2xl font-serif text-foreground mb-4">Shipping Time</h2>
             <div className="space-y-4">
               <div className="bg-secondary/30 rounded-2xl p-6">
-                <h3 className="font-semibold text-foreground mb-2">Canada & USA</h3>
+                <h3 className="font-semibold text-foreground mb-2">Canada & USA — Standard</h3>
                 <p className="text-foreground/80 text-base">
                   5–10 business days
+                </p>
+              </div>
+              <div className="bg-secondary/30 rounded-2xl p-6">
+                <h3 className="font-semibold text-foreground mb-2">Canada & USA — Express</h3>
+                <p className="text-foreground/80 text-base">
+                  2–3 business days
                 </p>
               </div>
               <div className="bg-secondary/30 rounded-2xl p-6">
@@ -46,6 +52,9 @@ export default function ShippingPage() {
                 </p>
               </div>
             </div>
+            <p className="text-foreground/60 text-sm mt-4">
+              Delivery times start once your order ships, and are in addition to processing time.
+            </p>
           </section>
 
           {/* Tracking */}
