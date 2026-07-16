@@ -59,6 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticUrls: MetadataRoute.Sitemap = [
     { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
     { url: `${BASE_URL}/shop-all`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
+    { url: `${BASE_URL}/guides/do-clear-phone-cases-turn-yellow`, lastModified: new Date('2026-07-16'), changeFrequency: 'monthly', priority: 0.85 },
     { url: `${BASE_URL}/category/iphone`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
     { url: `${BASE_URL}/category/airpods`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE_URL}/category/accessories`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
