@@ -138,7 +138,7 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
                       id: product.id,
                       name: product.name,
                       price: product.price,
-                      image_url: product.image_url,
+                      image_url: product.image_url ?? undefined,
                       device_model: selectedModel || undefined,
                       is_preorder: isPreorder,
                     })
