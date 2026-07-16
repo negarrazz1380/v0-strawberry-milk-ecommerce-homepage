@@ -1,6 +1,24 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+/**
+ * Lazy Resend client.
+ *
+ * Do NOT do `const resend = new Resend(process.env.RESEND_API_KEY)` at module
+ * scope. That runs at BUILD time, and the key only exists in Vercel's env —
+ * so every local `npm run build` dies with "Missing API key" before it can
+ * type-check anything. The getter defers creation until an email is actually
+ * sent, which only ever happens at runtime where the key exists.
+ */
+let resendClient: Resend | null = null
+
+const resend = {
+  get emails() {
+    if (!resendClient) {
+      resendClient = new Resend(process.env.RESEND_API_KEY)
+    }
+    return resendClient.emails
+  },
+}
 
 // Generic email sending function for contact form
 export async function sendEmail(params: {

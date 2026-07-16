@@ -2,7 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '')
+/**
+ * Lazy Stripe client.
+ *
+ * Do NOT do `const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '')` at
+ * module scope. That runs at BUILD time with an empty key, so every local
+ * `npm run build` dies with "Neither apiKey nor config.authenticator provided"
+ * before it can type-check anything. The getter defers creation until a real
+ * checkout runs, which only happens at runtime where the key exists.
+ */
+let stripeClient: Stripe | null = null
+
+const stripe = {
+  get checkout() {
+    if (!stripeClient) {
+      stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '')
+    }
+    return stripeClient.checkout
+  },
+}
 
 export async function POST(request: NextRequest) {
   try {

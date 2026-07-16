@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { ProductPageClient } from './ProductPageClient'
+import { ProductReviewsSection } from '@/components/product-reviews'
+import { fetchProductReviews } from '@/lib/reviews'
 import { isUUID } from '@/lib/product-slug'
 
 const BASE_URL = 'https://www.casekisses.com'
@@ -134,7 +136,11 @@ export default async function ProductPage({ params }: Props) {
   const canonicalUrl = `${BASE_URL}${canonicalPath}`
   const isInStock = product.stock > 0
 
-  const jsonLd = {
+  // Reviews are fetched on the server so both the visible list AND the
+  // AggregateRating schema below are in the initial HTML.
+  const reviewData = await fetchProductReviews(product.id)
+
+  const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
@@ -157,13 +163,49 @@ export default async function ProductPage({ params }: Props) {
     },
   }
 
+  /**
+   * AggregateRating + Review are added ONLY when real approved reviews exist.
+   *
+   * Never fabricate or hardcode these. Rating schema without matching visible
+   * reviews is a Google structured-data violation and can get the whole site's
+   * rich results suppressed — and AI engines cross-check it against the page.
+   */
+  if (reviewData.average !== null && reviewData.count > 0) {
+    jsonLd.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: reviewData.average,
+      reviewCount: reviewData.count,
+      bestRating: 5,
+      worstRating: 1,
+    }
+
+    jsonLd.review = reviewData.reviews.slice(0, 10).map((review) => ({
+      '@type': 'Review',
+      reviewRating: {
+        '@type': 'Rating',
+        ratingValue: review.rating,
+        bestRating: 5,
+        worstRating: 1,
+      },
+      author: { '@type': 'Person', name: review.reviewer_name },
+      datePublished: review.created_at,
+      ...(review.title ? { name: review.title } : {}),
+      ...(review.body ? { reviewBody: review.body } : {}),
+    }))
+  }
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ProductPageClient product={product} />
+      <ProductPageClient product={product} reviewSummary={{ count: reviewData.count, average: reviewData.average }} />
+      <ProductReviewsSection
+        productId={product.id}
+        productName={product.name}
+        data={reviewData}
+      />
     </>
   )
 }

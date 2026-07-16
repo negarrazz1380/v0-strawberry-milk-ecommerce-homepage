@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useCart } from '@/hooks/use-cart'
+import { StarRating } from '@/components/star-rating'
 import Link from 'next/link'
 import { ArrowLeft, ShoppingBag } from 'lucide-react'
 
@@ -25,9 +26,14 @@ interface ProductPageClientProps {
    * BingBot, etc.) and kills our search + AI visibility.
    */
   product: Product
+  /** Review summary from the server. Rendered as a jump-link to the reviews section. */
+  reviewSummary: {
+    count: number
+    average: number | null
+  }
 }
 
-export function ProductPageClient({ product }: ProductPageClientProps) {
+export function ProductPageClient({ product, reviewSummary }: ProductPageClientProps) {
   const { addItem } = useCart()
   const [adding, setAdding] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
@@ -75,6 +81,17 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
           <div className="flex flex-col gap-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-bold mb-2">{product.name}</h1>
+              {reviewSummary.average !== null && (
+                <a
+                  href="#reviews"
+                  className="inline-flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity"
+                >
+                  <StarRating rating={reviewSummary.average} />
+                  <span className="text-sm text-foreground/60">
+                    {reviewSummary.average} ({reviewSummary.count})
+                  </span>
+                </a>
+              )}
               <p className="text-2xl font-bold text-primary">
                 ${product.price.toFixed(2)}
               </p>

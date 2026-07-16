@@ -5,7 +5,31 @@ import { sendOrderConfirmationEmail } from '@/lib/email'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+/**
+ * Lazy Stripe client.
+ *
+ * Do NOT do `const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)` at
+ * module scope — that runs at BUILD time, where the key doesn't exist, and
+ * kills every local `npm run build`. These getters defer creation until a real
+ * webhook arrives at runtime.
+ */
+let stripeClient: Stripe | null = null
+
+function getStripeClient(): Stripe {
+  if (!stripeClient) {
+    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!)
+  }
+  return stripeClient
+}
+
+const stripe = {
+  get webhooks() {
+    return getStripeClient().webhooks
+  },
+  get checkout() {
+    return getStripeClient().checkout
+  },
+}
 
 // Diagnostic: GET handler to test webhook URL connectivity
 // This helps identify if 307 is from Vercel domain settings, trailing slash, or another layer
