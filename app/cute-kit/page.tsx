@@ -104,7 +104,7 @@ export default function CuteKitPage() {
           <p className="text-foreground/70 mb-12 text-pretty">
             No email, no signup, no &ldquo;share to unlock.&rdquo; A cute case
             deserves a matching screen, and charging you for a background would be
-            silly.
+            silly. Crop or reposition them however you like — they&rsquo;re yours.
           </p>
         </div>
 
