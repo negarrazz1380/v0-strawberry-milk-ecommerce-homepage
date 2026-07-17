@@ -22,6 +22,9 @@ interface Product {
   image_alt: string | null
   seo_title: string | null
   seo_description: string | null
+  has_magsafe: boolean | null
+  wireless_charging_ok: boolean | null
+  back_material: string | null
   category: string | null
   device_models: string[] | null
   stock: number
@@ -39,7 +42,7 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   if (isUUID(idOrSlug)) {
     const { data } = await supabase
       .from('products')
-      .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, category, device_models, stock')
+      .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, has_magsafe, wireless_charging_ok, back_material, category, device_models, stock')
       .eq('id', idOrSlug)
       .single()
     return data ?? null
@@ -48,7 +51,7 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   // Treat as slug
   const { data } = await supabase
     .from('products')
-    .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, category, device_models, stock')
+    .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, has_magsafe, wireless_charging_ok, back_material, category, device_models, stock')
     .eq('slug', idOrSlug)
     .single()
   return data ?? null
@@ -181,6 +184,40 @@ export default async function ProductPage({ params }: Props) {
       }
     : undefined
 
+  /**
+   * Confirmed hardware specs, as schema additionalProperty.
+   *
+   * ONLY non-null values are emitted. A NULL spec means "we haven't confirmed
+   * it", and the correct behaviour is to say nothing at all rather than guess.
+   * This is what lets an AI answer "does the teddy case work with MagSafe?" —
+   * but only for products where we actually know.
+   */
+  const specs: Array<Record<string, unknown>> = []
+  if (product.back_material) {
+    specs.push({
+      '@type': 'PropertyValue',
+      name: 'Back material',
+      value: product.back_material,
+    })
+  }
+  if (product.has_magsafe !== null && product.has_magsafe !== undefined) {
+    specs.push({
+      '@type': 'PropertyValue',
+      name: 'MagSafe compatible',
+      value: product.has_magsafe ? 'Yes' : 'No',
+    })
+  }
+  if (
+    product.wireless_charging_ok !== null &&
+    product.wireless_charging_ok !== undefined
+  ) {
+    specs.push({
+      '@type': 'PropertyValue',
+      name: 'Wireless charging compatible',
+      value: product.wireless_charging_ok ? 'Yes' : 'No',
+    })
+  }
+
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -191,6 +228,8 @@ export default async function ProductPage({ params }: Props) {
     brand: { '@type': 'Brand', name: 'CaseKisses' },
     category: product.category || 'Phone Cases',
     url: canonicalUrl,
+    ...(specs.length > 0 ? { additionalProperty: specs } : {}),
+    ...(product.back_material ? { material: product.back_material } : {}),
     /**
      * Explicit entity links to the devices this case fits.
      *

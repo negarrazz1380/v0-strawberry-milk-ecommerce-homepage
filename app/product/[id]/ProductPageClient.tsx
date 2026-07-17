@@ -14,6 +14,9 @@ interface Product {
   image_alt?: string | null
   description: string | null
   device_models?: string[] | null
+  has_magsafe?: boolean | null
+  wireless_charging_ok?: boolean | null
+  back_material?: string | null
   stock: number
 }
 
@@ -104,6 +107,36 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
                 <p className="text-foreground/80 leading-relaxed text-pretty">
                   {product.description}
                 </p>
+              </div>
+            )}
+
+            {/* Confirmed specs. Only renders rows we actually know — a null
+                spec is omitted entirely rather than shown as "unknown". */}
+            {(product.back_material ||
+              product.has_magsafe !== null && product.has_magsafe !== undefined ||
+              product.wireless_charging_ok !== null && product.wireless_charging_ok !== undefined) && (
+              <div>
+                <h2 className="text-sm font-semibold text-foreground/70 mb-2">Specs</h2>
+                <ul className="text-foreground/80 text-sm space-y-1">
+                  {product.back_material && (
+                    <li>
+                      <span className="text-foreground/60">Material:</span>{' '}
+                      {product.back_material}
+                    </li>
+                  )}
+                  {product.has_magsafe !== null && product.has_magsafe !== undefined && (
+                    <li>
+                      <span className="text-foreground/60">MagSafe:</span>{' '}
+                      {product.has_magsafe ? 'Yes' : 'No'}
+                    </li>
+                  )}
+                  {product.wireless_charging_ok !== null && product.wireless_charging_ok !== undefined && (
+                    <li>
+                      <span className="text-foreground/60">Wireless charging:</span>{' '}
+                      {product.wireless_charging_ok ? 'Yes' : 'No'}
+                    </li>
+                  )}
+                </ul>
               </div>
             )}
 

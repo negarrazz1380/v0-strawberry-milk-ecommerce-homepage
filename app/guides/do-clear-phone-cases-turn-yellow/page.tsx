@@ -388,31 +388,38 @@ export default function ClearCaseYellowingGuide() {
             </ul>
           </section>
 
-          {/* Honesty section. Do NOT add an anti-yellowing claim here unless it
-              has been verified with the supplier (PC back? UV stabiliser? test
-              results?). An unverifiable claim on this page would undo the exact
-              trust the page exists to build. */}
+          {/* Honesty section.
+
+              Supplier has confirmed: PC back + UV stabiliser / anti-yellow
+              additive. That supports the SPEC claims below.
+
+              ⚠️ DO NOT upgrade this to a performance claim — no "stays clear
+              for 12+ months", no "won't yellow", no timeline promise — unless a
+              UV exposure test result from the supplier is on file. Stating the
+              material is a fact; predicting the outcome is a claim, and an
+              unbackable claim on THIS page destroys the trust it exists to
+              build. */}
           <section className="bg-secondary/20 rounded-2xl p-6 sm:p-8">
             <h2 className="text-2xl font-serif text-foreground mb-4">
               Where CaseKisses stands on this
             </h2>
             <p className="text-foreground/80 leading-relaxed mb-4 text-pretty">
-              We would rather tell you this up front than have you discover it in
-              four months.
+              We would rather give you the spec than a promise.
             </p>
             <p className="text-foreground/80 leading-relaxed mb-4 text-pretty">
-              Our clear cases are TPU, like almost every clear case on the
-              market. That means they will yellow eventually. We are not going
-              to tell you ours are magically different, because we would rather
-              you trust the rest of what we say.
+              Our cases are built with a{' '}
+              <strong>polycarbonate (PC) back</strong>, not the pure TPU used in
+              most budget clear cases — and the material includes a{' '}
+              <strong>UV stabiliser</strong>, the additive that slows the
+              photo-oxidation described above. Those are the two things this
+              whole guide tells you to look for, and they are the two things
+              almost nobody in the cute-case aisle will tell you either way.
             </p>
             <p className="text-foreground/80 leading-relaxed mb-4 text-pretty">
-              What we will tell you: treat a clear case as something you replace,
-              not something you keep forever. Keep it out of the sun, wipe it
-              weekly, and you will get closer to the top of that 2–9 month range
-              than the bottom. And if you want an aesthetic that ages more
-              gracefully, our cases with heavier 3D detailing and colour hide
-              wear better than a plain clear back does.
+              What we are not going to tell you is that they will never yellow.
+              No clear plastic is permanent, and any brand promising otherwise is
+              selling you something. Keep a clear case out of direct sun, wipe it
+              weekly, and the material will do the rest.
             </p>
             <p className="text-foreground/80 leading-relaxed text-pretty">
               A cute case should make you happy every time you look at it. That
