@@ -80,10 +80,16 @@ const organizationJsonLd = {
   slogan: 'Cute phone cases for cute prices.',
   // Only list profiles we actually own. A wrong URL here tells Google and AI
   // that someone else's account is us — worse than listing nothing.
+  //
+  // The Facebook URL is the numeric page ID because the page has no custom
+  // username set. That is the canonical form Facebook itself reports — do not
+  // swap in a /share/... link, those carry tracking params and are temporary.
+  // If a username is ever claimed, update this AND components/footer.tsx.
   // TODO: add Pinterest once that account exists.
   sameAs: [
     'https://www.tiktok.com/@casekisses',
     'https://www.instagram.com/casekisses.shop/',
+    'https://www.facebook.com/61591666035198/',
   ],
 }
 
