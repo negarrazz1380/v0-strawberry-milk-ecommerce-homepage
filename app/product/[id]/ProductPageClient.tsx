@@ -12,6 +12,7 @@ interface Product {
   price: number
   image_url: string | null
   image_alt?: string | null
+  seo_title?: string | null
   description: string | null
   device_models?: string[] | null
   has_magsafe?: boolean | null
@@ -84,7 +85,21 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
           {/* Product Info */}
           <div className="flex flex-col gap-6">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold mb-2">{product.name}</h1>
+              {/* H1 carries the search phrase, not the invented brand name.
+
+                  Nobody searches "Cocoa Teddy Charm Case" — they search "cute
+                  teddy bear iphone case". The H1 is one of the strongest
+                  on-page signals, and it previously disagreed with the <title>,
+                  which targeted the search phrase. Now they match, and the cute
+                  name lives on as the subtitle so the branding survives. */}
+              <h1 className="text-3xl sm:text-4xl font-bold mb-1">
+                {product.seo_title || product.name}
+              </h1>
+              {product.seo_title && product.seo_title !== product.name && (
+                <p className="text-lg text-foreground/60 font-serif mb-2">
+                  {product.name}
+                </p>
+              )}
               {reviewSummary.average !== null && (
                 <a
                   href="#reviews"
