@@ -62,9 +62,10 @@ const socialLinks = [
   },
   {
     label: "Facebook",
-    // Numeric page ID — the page has no custom username. Must stay in sync with
-    // the `sameAs` list in app/layout.tsx.
-    href: "https://www.facebook.com/61591666035198/",
+    // Username casekisses.shop — resolves to page ID 61591666035198, which is the
+    // permanent fallback if the username is ever released. Must stay in sync
+    // with the `sameAs` list in app/layout.tsx.
+    href: "https://www.facebook.com/casekisses.shop/",
     icon: (
       <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
         <path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.41 0 12.07c0 6.02 4.39 11.01 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.24 2.69.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8v8.44C19.61 23.08 24 18.09 24 12.07z" />
