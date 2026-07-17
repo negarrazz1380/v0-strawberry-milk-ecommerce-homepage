@@ -2,6 +2,27 @@ import { createClient } from '@/lib/supabase/server'
 import { ProductCard } from '@/components/product-card'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import type { Metadata } from 'next'
+
+/**
+ * This page previously had NO metadata export, so it inherited the layout's
+ * default title — meaning /shop-all and the homepage shipped identical titles
+ * and competed with each other. Search language goes first; the layout appends
+ * "| CaseKisses".
+ */
+export const metadata: Metadata = {
+  title: 'Cute Phone Cases — Shop All',
+  description:
+    'Browse every CaseKisses design — cute, coquette iPhone cases with 3D bows, cherries, teddy bear charms and pastel finishes. Fits iPhone 12 through iPhone 17. Free standard shipping to Canada and the USA.',
+  alternates: { canonical: 'https://www.casekisses.com/shop-all' },
+  openGraph: {
+    title: 'Cute Phone Cases — Shop All | CaseKisses',
+    description:
+      'Browse every CaseKisses design — cute, coquette iPhone cases with bows, cherries and charms.',
+    url: 'https://www.casekisses.com/shop-all',
+    type: 'website',
+  },
+}
 
 interface Product {
   id: string

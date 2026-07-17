@@ -3,8 +3,13 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 export const metadata = {
-  title: "About CaseKisses | Our Story",
-  description: "Learn about CaseKisses and our mission to create cute, girly phone cases.",
+  // The layout appends "| CaseKisses" — so this previously rendered as
+  // "About CaseKisses | Our Story | CaseKisses". Keep page titles free of the
+  // brand name.
+  title: "Our Story",
+  description:
+    "CaseKisses is a Toronto-based brand making cute, coquette iPhone cases — bows, cherries, teddy charms and pastels. Canadian owned, ships from Toronto.",
+  alternates: { canonical: "https://www.casekisses.com/about" },
 }
 
 export default function AboutPage() {

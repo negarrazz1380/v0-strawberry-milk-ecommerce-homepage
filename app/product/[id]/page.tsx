@@ -5,6 +5,7 @@ import { ProductPageClient } from './ProductPageClient'
 import { ProductReviewsSection } from '@/components/product-reviews'
 import { fetchProductReviews } from '@/lib/reviews'
 import { isUUID } from '@/lib/product-slug'
+import { buildBreadcrumbJsonLd } from '@/lib/breadcrumbs'
 
 const BASE_URL = 'https://www.casekisses.com'
 
@@ -336,6 +337,21 @@ export default async function ProductPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            buildBreadcrumbJsonLd([
+              { name: 'Home', path: '/' },
+              { name: 'Shop All', path: '/shop-all' },
+              // Final crumb uses the search-language title where we have one,
+              // so the breadcrumb agrees with the <title> rather than showing
+              // the invented brand name.
+              { name: buildTitle(product) },
+            ])
+          ),
+        }}
       />
       <ProductPageClient product={product} reviewSummary={{ count: reviewData.count, average: reviewData.average }} />
       <ProductReviewsSection
