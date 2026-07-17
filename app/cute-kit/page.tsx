@@ -4,6 +4,7 @@ import { Footer } from '@/components/footer'
 import { buildBreadcrumbJsonLd } from '@/lib/breadcrumbs'
 import { WALLPAPERS } from '@/lib/wallpapers'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const BASE_URL = 'https://www.casekisses.com'
 const CANONICAL = `${BASE_URL}/cute-kit`
@@ -113,11 +114,15 @@ export default function CuteKitPage() {
             {WALLPAPERS.map((wallpaper) => (
               <div key={wallpaper.id} className="group">
                 <div className="relative rounded-2xl overflow-hidden bg-secondary/30 aspect-[9/19.5] mb-3">
-                  <img
+                  {/* Preview only — Next serves a small optimized thumbnail
+                      here. The download link below points at the full-size
+                      original, which is what we actually want people to keep. */}
+                  <Image
                     src={wallpaper.file}
                     alt={wallpaper.alt}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover"
                   />
                 </div>
                 <p className="text-sm font-semibold text-foreground mb-2">

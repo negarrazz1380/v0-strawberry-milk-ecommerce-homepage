@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProductCard } from '@/components/product-card'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -58,35 +60,45 @@ export default async function ShopAllPage() {
 
   const products: Product[] = data ?? []
 
+  // Header and Footer are NOT in the root layout — each page adds them.
+  // This page shipped without either, so it was a navigation dead end: no nav,
+  // no policy links, no guides, no newsletter. Anyone landing here from search
+  // or TikTok had one back-arrow and nothing else.
   return (
-    <div className="min-h-screen pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="p-2 hover:bg-accent rounded-full transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <h1 className="text-3xl font-bold" style={{ color: '#c0304f' }}>
-            Shop All
-          </h1>
-        </div>
+    <>
+      <Header />
+      <div className="min-h-screen pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Header */}
+          <div className="flex items-center gap-4 mb-8">
+            <Link href="/" className="p-2 hover:bg-accent rounded-full transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+            {/* H1 matches the <title> — both target the search phrase rather
+                than the internal label "Shop All". */}
+            <h1 className="text-3xl font-bold" style={{ color: '#c0304f' }}>
+              Cute Phone Cases
+            </h1>
+          </div>
 
-        {/* Products Grid */}
-        {products.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-lg text-foreground/60">No products available</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-              />
-            ))}
-          </div>
-        )}
+          {/* Products Grid */}
+          {products.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-lg text-foreground/60">No products available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      <Footer />
+    </>
   )
 }

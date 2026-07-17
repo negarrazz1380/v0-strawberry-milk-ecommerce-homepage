@@ -3,6 +3,8 @@ import { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { ProductPageClient } from './ProductPageClient'
 import { ProductReviewsSection } from '@/components/product-reviews'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 import { fetchProductReviews } from '@/lib/reviews'
 import { isUUID } from '@/lib/product-slug'
 import { buildBreadcrumbJsonLd } from '@/lib/breadcrumbs'
@@ -353,12 +355,21 @@ export default async function ProductPage({ params }: Props) {
           ),
         }}
       />
+      {/* Header and Footer live HERE, not inside ProductPageClient — the
+          reviews section renders after it, so a footer inside the client
+          component would sit above the reviews.
+
+          This page previously had neither. It's the page most people LAND on
+          (from search, TikTok, or an AI citation), and it offered no nav, no
+          policy links, no guides and no newsletter — just a back arrow. */}
+      <Header />
       <ProductPageClient product={product} reviewSummary={{ count: reviewData.count, average: reviewData.average }} />
       <ProductReviewsSection
         productId={product.id}
         productName={product.name}
         data={reviewData}
       />
+      <Footer />
     </>
   )
 }

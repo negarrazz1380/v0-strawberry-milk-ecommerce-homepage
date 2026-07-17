@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useCart } from '@/hooks/use-cart'
 import { StarRating } from '@/components/star-rating'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, ShoppingBag } from 'lucide-react'
 
 interface Product {
@@ -70,12 +71,18 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           {/* Product Image */}
-          <div className="flex items-center justify-center bg-accent rounded-3xl overflow-hidden aspect-square">
+          <div className="relative flex items-center justify-center bg-accent rounded-3xl overflow-hidden aspect-square">
             {product.image_url ? (
-              <img
+              <Image
                 src={product.image_url}
                 alt={product.image_alt || product.name}
-                className="w-full h-full object-cover"
+                fill
+                /* This is the Largest Contentful Paint element on the page —
+                   `priority` preloads it instead of lazy-loading, so it starts
+                   downloading immediately rather than after hydration. */
+                priority
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
               />
             ) : (
               <div className="text-foreground/30 text-lg">No image available</div>

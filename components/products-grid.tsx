@@ -7,6 +7,7 @@ interface Product {
   name: string
   price: number
   image_url: string
+  image_alt?: string | null
   stock: number
   sales_count?: number
   is_best_seller?: boolean
@@ -15,9 +16,11 @@ interface Product {
 
 export async function ProductsGrid() {
   const supabase = await createClient()
+  // image_alt must be selected here or ProductCard silently falls back to the
+  // product NAME as alt text — which describes the product, not the picture.
   const { data, error } = await supabase
     .from('products')
-    .select('id, slug, name, price, image_url, stock, sales_count, is_best_seller, show_on_homepage')
+    .select('id, slug, name, price, image_url, image_alt, stock, sales_count, is_best_seller, show_on_homepage')
     .eq('is_active', true)
     .eq('show_on_homepage', true)
     .order('created_at', { ascending: false })

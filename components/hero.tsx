@@ -52,6 +52,10 @@ export function Hero() {
                 src="https://jiybdkvylfaabznyqpes.supabase.co/storage/v1/object/public/product-images/cute_iphone_case.png"
                 alt="Cute pastel pink phone cases collection"
                 fill
+                /* Without `sizes`, a `fill` image defaults to 100vw and Next
+                   serves a desktop-width file to phones. This box maxes out at
+                   max-w-sm (384px), so cap it. */
+                sizes="(max-width: 768px) 100vw, 384px"
                 className="object-cover"
                 priority
               />
