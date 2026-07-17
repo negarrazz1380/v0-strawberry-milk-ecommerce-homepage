@@ -18,13 +18,13 @@ export const metadata: Metadata = {
     default: 'CaseKisses — Cute Phone Cases for Cute Prices',
     template: '%s | CaseKisses',
   },
-  description: 'Shop adorable, girly phone cases and AirPods cases. Free shipping on orders over $35.',
+  description: 'Shop adorable, girly phone cases and AirPods cases. Free standard shipping to Canada and the USA.',
   alternates: {
     canonical: 'https://www.casekisses.com',
   },
   openGraph: {
     title: 'CaseKisses — Cute Phone Cases for Cute Prices',
-    description: 'Shop adorable, girly phone cases and AirPods cases. Free shipping on orders over $35.',
+    description: 'Shop adorable, girly phone cases and AirPods cases. Free standard shipping to Canada and the USA.',
     url: 'https://www.casekisses.com',
     siteName: 'CaseKisses',
     images: [

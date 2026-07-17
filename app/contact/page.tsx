@@ -70,8 +70,8 @@ export default function ContactPage() {
               <p className="text-sm text-foreground/80 mb-3">
                 For order issues
               </p>
-              <a href="mailto:casekisses.support@gmail.com" className="text-primary hover:opacity-80 transition font-medium">
-                casekisses.support@gmail.com
+              <a href="mailto:casekissessupport@gmail.com" className="text-primary hover:opacity-80 transition font-medium">
+                casekissessupport@gmail.com
               </a>
             </div>
           </div>

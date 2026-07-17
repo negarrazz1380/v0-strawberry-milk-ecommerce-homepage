@@ -22,6 +22,27 @@ const stripe = {
   },
 }
 
+/**
+ * Currency for all Stripe charges.
+ *
+ * ⚠️ THIS WAS 'usd' AND IS NOW 'cad'. Read this before changing it back.
+ *
+ * Everything else in this codebase says the prices are Canadian dollars:
+ *   - Product JSON-LD           → priceCurrency: 'CAD'
+ *   - TikTok pixel events       → currency: 'CAD'
+ *   - public/llms.txt           → "Currency: CAD"
+ *   - The business is in Toronto and shipping rates are quoted in CAD.
+ *
+ * Only the Stripe call said 'usd' — almost certainly a leftover default from
+ * the v0 template this repo started as. Charging USD while advertising a CAD
+ * price means a customer sees $29.99 and is billed ~$41 CAD, which is both a
+ * chargeback risk and a broken promise.
+ *
+ * Defined ONCE here because it was previously hardcoded in two places (line
+ * items and shipping) and those must never disagree.
+ */
+const CURRENCY = 'cad'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -127,7 +148,7 @@ export async function POST(request: NextRequest) {
       const unitAmount = Math.round(priceMap.get(item.id)! * 100)
       return {
         price_data: {
-          currency: 'usd',
+          currency: CURRENCY,
           product_data: {
             name: displayName,
             images: item.image_url ? [item.image_url] : undefined,
@@ -141,7 +162,7 @@ export async function POST(request: NextRequest) {
     // Add shipping as a line item
     line_items.push({
       price_data: {
-        currency: 'usd',
+        currency: CURRENCY,
         product_data: {
           name: `${shippingMethod === 'standard' ? 'Standard' : 'Express'} Shipping`,
         },

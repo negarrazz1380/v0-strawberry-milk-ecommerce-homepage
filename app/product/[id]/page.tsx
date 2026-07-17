@@ -20,6 +20,8 @@ interface Product {
   price: number
   image_url: string | null
   image_alt: string | null
+  seo_title: string | null
+  seo_description: string | null
   category: string | null
   device_models: string[] | null
   stock: number
@@ -37,7 +39,7 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   if (isUUID(idOrSlug)) {
     const { data } = await supabase
       .from('products')
-      .select('id, slug, name, description, price, image_url, image_alt, category, device_models, stock')
+      .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, category, device_models, stock')
       .eq('id', idOrSlug)
       .single()
     return data ?? null
@@ -46,25 +48,43 @@ async function fetchProduct(idOrSlug: string): Promise<Product | null> {
   // Treat as slug
   const { data } = await supabase
     .from('products')
-    .select('id, slug, name, description, price, image_url, image_alt, category, device_models, stock')
+    .select('id, slug, name, description, price, image_url, image_alt, seo_title, seo_description, category, device_models, stock')
     .eq('slug', idOrSlug)
     .single()
   return data ?? null
 }
 
-function buildTitle(product: Pick<Product, 'name' | 'device_models'>): string {
+/**
+ * Builds the <title> for a product page.
+ *
+ * Prefers seo_title — search language people actually type ("Cute Teddy Bear
+ * iPhone Case"). Our product NAMES are invented brand names ("Cocoa Teddy Charm
+ * Case") with no search volume, so they're only a fallback.
+ *
+ * The layout appends "| CaseKisses", so don't add it here.
+ */
+function buildTitle(product: Pick<Product, 'name' | 'seo_title' | 'device_models'>): string {
+  if (product.seo_title) {
+    return product.seo_title
+  }
+
   const model = product.device_models?.[0] ?? null
-  return model
-    ? `${product.name} for ${model} | CaseKisses`
-    : `${product.name} | CaseKisses`
+  return model ? `${product.name} for ${model}` : product.name
 }
 
-function buildDescription(product: Pick<Product, 'name' | 'description' | 'category' | 'device_models'>): string {
-  if (product.description) {
-    return product.description.length > 160
-      ? product.description.slice(0, 157) + '...'
-      : product.description
+function buildDescription(
+  product: Pick<Product, 'name' | 'description' | 'seo_description' | 'category' | 'device_models'>
+): string {
+  if (product.seo_description) {
+    return product.seo_description
   }
+
+  if (product.description) {
+    // Strip newlines so the meta description stays a single clean line.
+    const flat = product.description.replace(/\s+/g, ' ').trim()
+    return flat.length > 160 ? flat.slice(0, 157) + '...' : flat
+  }
+
   const model = product.device_models?.[0] ?? null
   return [
     `Shop ${product.name}`,

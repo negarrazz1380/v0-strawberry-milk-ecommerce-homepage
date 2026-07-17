@@ -29,8 +29,11 @@ export async function sendEmail(params: {
 }): Promise<void> {
   const { name, email, subject, message } = params
   await resend.emails.send({
+    // `from` MUST stay on a domain verified in Resend — it cannot be a gmail.com
+    // address, or sending fails. Only the `to`/contact addresses are the
+    // support inbox.
     from: 'CaseKisses <orders@casekisses.com>',
-    to: 'casekisses.support@gmail.com',
+    to: 'casekissessupport@gmail.com',
     subject: `New Contact Form Message: ${subject}`,
     html: `<h2>New message from your site</h2><p><strong>Name:</strong> ${name}</p><p><strong>Email:</strong> ${email}</p><p><strong>Subject:</strong> ${subject}</p><p><strong>Message:</strong><br/>${message}</p>`,
   })
@@ -187,7 +190,7 @@ export async function sendOrderConfirmationEmail(order: Order) {
                   
                   <!-- Additional Info -->
                   <p style="margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 14px; line-height: 1.6;">
-                    Once your order ships, we'll send you a tracking number so you can follow your package every step of the way. If you have any questions, feel free to reply to this email or contact us at <a href="mailto:support@casekisses.com" style="color: #d4456f; text-decoration: none;">support@casekisses.com</a>.
+                    Once your order ships, we'll send you a tracking number so you can follow your package every step of the way. If you have any questions, feel free to reply to this email or contact us at <a href="mailto:casekissessupport@gmail.com" style="color: #d4456f; text-decoration: none;">casekissessupport@gmail.com</a>.
                   </p>
                   
                 </td>
@@ -486,7 +489,7 @@ export async function sendOrderShippedEmail(order: Order) {
                   
                   <!-- Support Info -->
                   <p style="margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 14px; line-height: 1.6;">
-                    Have questions about your shipment? You can check your tracking information at any time, or contact us at <a href="mailto:support@casekisses.com" style="color: #d4456f; text-decoration: none;">support@casekisses.com</a>.
+                    Have questions about your shipment? You can check your tracking information at any time, or contact us at <a href="mailto:casekissessupport@gmail.com" style="color: #d4456f; text-decoration: none;">casekissessupport@gmail.com</a>.
                   </p>
                   
                 </td>
@@ -581,7 +584,7 @@ export async function sendShippingUpdateEmail(order: Order) {
         
         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
           <p style="color: #999; font-size: 12px; margin: 0;">
-            Questions? Reply to this email or contact us at support@casekisses.com
+            Questions? Reply to this email or contact us at casekissessupport@gmail.com
           </p>
           <p style="color: #d4456f; font-size: 14px; margin-top: 15px;">
             💖 CaseKisses - Protect Your Phone in Style

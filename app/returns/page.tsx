@@ -77,7 +77,7 @@ export default function ReturnsPage() {
           <section>
             <h2 className="text-2xl font-serif text-foreground mb-4">How to Start a Return</h2>
             <p className="text-foreground/80 leading-relaxed mb-4">
-              Email us at <a href="mailto:support@casekisses.com" className="text-primary hover:opacity-80 transition font-semibold">support@casekisses.com</a> 💌
+              Email us at <a href="mailto:casekissessupport@gmail.com" className="text-primary hover:opacity-80 transition font-semibold">casekissessupport@gmail.com</a> 💌
             </p>
             <p className="text-foreground/80 leading-relaxed text-sm mb-4">
               Please include:
@@ -121,7 +121,7 @@ export default function ReturnsPage() {
 
         {/* CTA */}
         <div className="mt-12 flex gap-4 justify-center flex-wrap">
-          <a href="mailto:support@casekisses.com" className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition">
+          <a href="mailto:casekissessupport@gmail.com" className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition">
             Start a Return
           </a>
           <Link href="/faq" className="border border-primary text-primary px-8 py-3 rounded-full font-semibold hover:bg-primary/10 transition">
