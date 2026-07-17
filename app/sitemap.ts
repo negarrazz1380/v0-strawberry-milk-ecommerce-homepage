@@ -60,6 +60,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
     { url: `${BASE_URL}/shop-all`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     { url: `${BASE_URL}/guides/do-clear-phone-cases-turn-yellow`, lastModified: new Date('2026-07-16'), changeFrequency: 'monthly', priority: 0.85 },
+    { url: `${BASE_URL}/guides/what-is-the-coquette-aesthetic`, lastModified: new Date('2026-07-17'), changeFrequency: 'monthly', priority: 0.85 },
+    { url: `${BASE_URL}/cute-kit`, lastModified: new Date('2026-07-17'), changeFrequency: 'monthly', priority: 0.8 },
     { url: `${BASE_URL}/category/iphone`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
     { url: `${BASE_URL}/category/airpods`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE_URL}/category/accessories`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
