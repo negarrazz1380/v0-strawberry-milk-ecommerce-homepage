@@ -23,18 +23,10 @@ COMMENT ON COLUMN products.wireless_charging_ok IS
 COMMENT ON COLUMN products.back_material IS
   'e.g. "Polycarbonate (PC) back with TPU bumper". Supplier-confirmed only.';
 
--- Supplier confirmed a PC back + UV stabiliser.
---
--- ⚠️ Applied ONLY to the two CLEAR cases. The product photos show that Cherry
--- Bliss, Cocoa Teddy and Puppy Blush are opaque cream / brown-tinted, not clear
--- — yellowing is a clear-case problem, and the supplier's answer was given in
--- that context. Leaving their material NULL (= site says nothing) until it is
--- confirmed separately, rather than claiming a spec that may not apply.
+-- Supplier confirmed: PC back + UV stabiliser, and confirmed this applies to
+-- the opaque cases too — not just the clear ones.
 UPDATE products SET back_material = 'Polycarbonate (PC) back with UV stabiliser'
-  WHERE slug IN (
-    'adorable-pink-bow-cherry-case-iphone-12-series',
-    'softie-charm-case-iphone-13-series'
-  );
+  WHERE is_active;
 
 -- ⬇️ FILL THESE IN. Replace NULL with true or false per product.
 -- Leave NULL for anything you have not confirmed with the supplier.

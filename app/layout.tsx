@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'CaseKisses — Cute Phone Cases for Cute Prices',
-    description: 'Shop adorable, girly phone cases and AirPods cases. Free shipping on orders over $35.',
+    description: 'Shop adorable, girly phone cases and AirPods cases. Free standard shipping to Canada and the USA.',
     images: ['https://www.casekisses.com/images/casekiss-logo.png'],
   },
   icons: {
@@ -80,9 +80,10 @@ const organizationJsonLd = {
   slogan: 'Cute phone cases for cute prices.',
   // Only list profiles we actually own. A wrong URL here tells Google and AI
   // that someone else's account is us — worse than listing nothing.
-  // TODO: add the real Instagram URL, and Pinterest once that account exists.
+  // TODO: add Pinterest once that account exists.
   sameAs: [
     'https://www.tiktok.com/@casekisses',
+    'https://www.instagram.com/casekisses.shop/',
   ],
 }
 
