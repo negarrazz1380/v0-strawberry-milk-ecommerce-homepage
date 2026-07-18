@@ -8,6 +8,7 @@ export interface FetchProductsResult {
     is_active: boolean
     created_at: string | null
     device_models: string[] | null
+    category: string | null
   }>
   error: Error | null
 }
@@ -30,9 +31,12 @@ export async function fetchSitemapProducts(): Promise<FetchProductsResult> {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+  // `category` is needed so the sitemap can list ONLY category pages that
+  // actually have products — submitting empty pages gets them logged as
+  // "Crawled - currently not indexed" and wastes crawl budget.
   const { data, error: dbError } = await supabase
     .from('products')
-    .select('id, name, slug, is_active, created_at, device_models')
+    .select('id, name, slug, is_active, created_at, device_models, category')
     .eq('is_active', true)
 
   if (dbError) {

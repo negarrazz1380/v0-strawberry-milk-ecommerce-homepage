@@ -39,12 +39,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   )
 
   const deviceUrls: MetadataRoute.Sitemap = [
-    {
-      url: `${BASE_URL}/iphone`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.85,
-    },
+    /**
+     * NOTE: /iphone is deliberately NOT listed.
+     *
+     * It 307-redirects to / (see next.config.mjs). A redirecting URL in a
+     * sitemap tells Google "index this" and then hands it something else —
+     * which is exactly what shows up in Search Console as "Page with redirect".
+     * Only ever list URLs that return 200.
+     */
     ...Object.entries(IPHONE_MODELS_MAP)
       .filter(([, displayName]) => modelsWithProducts.has(displayName))
       .map(([slug]) => ({
@@ -55,6 +57,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
   ]
 
+  /**
+   * Category pages, derived from live product data.
+   *
+   * Only categories that actually contain a product are listed. /category/airpods
+   * and /category/accessories were previously hardcoded here while containing
+   * zero products — Google crawled them, found nothing, and filed them under
+   * "Crawled - currently not indexed". Empty pages in a sitemap spend crawl
+   * budget that a new domain does not have to spare.
+   */
+  const categoriesWithProducts = new Set(
+    products.map((product) => product.category).filter(Boolean) as string[]
+  )
+
+  const categoryUrls: MetadataRoute.Sitemap = Array.from(categoriesWithProducts).map(
+    (category) => ({
+      url: `${BASE_URL}/category/${category}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.85,
+    })
+  )
+
   // Static public-facing pages only — auth, admin, cart, checkout excluded
   const staticUrls: MetadataRoute.Sitemap = [
     { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
@@ -62,9 +86,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/guides/do-clear-phone-cases-turn-yellow`, lastModified: new Date('2026-07-16'), changeFrequency: 'monthly', priority: 0.85 },
     { url: `${BASE_URL}/guides/what-is-the-coquette-aesthetic`, lastModified: new Date('2026-07-17'), changeFrequency: 'monthly', priority: 0.85 },
     { url: `${BASE_URL}/cute-kit`, lastModified: new Date('2026-07-17'), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${BASE_URL}/category/iphone`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
-    { url: `${BASE_URL}/category/airpods`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
-    { url: `${BASE_URL}/category/accessories`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE_URL}/shop/best-sellers`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.85 },
     { url: `${BASE_URL}/shop/last-chance`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.8 },
     { url: `${BASE_URL}/about`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },
@@ -78,5 +99,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/terms`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.4 },
   ]
 
-  return [...staticUrls, ...deviceUrls, ...productUrls]
+  return [...staticUrls, ...categoryUrls, ...deviceUrls, ...productUrls]
 }
