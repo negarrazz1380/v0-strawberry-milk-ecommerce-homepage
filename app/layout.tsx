@@ -19,9 +19,6 @@ export const metadata: Metadata = {
     template: '%s | CaseKisses',
   },
   description: 'Shop adorable, girly phone cases and AirPods cases. Free standard shipping to Canada and the USA.',
-  alternates: {
-    canonical: 'https://www.casekisses.com',
-  },
   openGraph: {
     title: 'CaseKisses — Cute Phone Cases for Cute Prices',
     description: 'Shop adorable, girly phone cases and AirPods cases. Free standard shipping to Canada and the USA.',

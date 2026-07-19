@@ -2,8 +2,9 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 
 export const metadata = {
-  title: "Privacy Policy | Case Kiss",
+  title: "Privacy Policy",
   description: "Our privacy policy and how we handle your data.",
+  alternates: { canonical: "/privacy" },
 }
 
 export default function PrivacyPage() {

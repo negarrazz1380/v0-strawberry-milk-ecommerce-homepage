@@ -3,8 +3,9 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 export const metadata = {
-  title: "Exchange Your Case | CaseKisses",
+  title: "Exchange Your Case",
   description: "Process an exchange for your CaseKisses order.",
+  alternates: { canonical: "/exchange" },
 }
 
 export default function ExchangePage() {

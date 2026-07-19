@@ -7,7 +7,7 @@ import Link from 'next/link'
 const BASE_URL = 'https://www.casekisses.com'
 
 export const metadata: Metadata = {
-  title: 'Cute iPhone Cases | CaseKisses',
+  title: 'Cute iPhone Cases',
   description:
     'Shop cute iPhone cases from CaseKisses. Find aesthetic, stylish, and protective iPhone cases for your favorite model.',
   alternates: {
