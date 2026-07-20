@@ -5,7 +5,7 @@
  * These helpers fire GA4 recommended ecommerce events. They are safe to call
  * anywhere — on the server, or before gtag has loaded, they simply no-op.
  */
-export const GA_MEASUREMENT_ID = 'G-JZNL8GX2J'
+export const GA_MEASUREMENT_ID = 'G-JZNL80GX2J'
 
 type GtagParams = Record<string, unknown>
 
