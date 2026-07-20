@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/hooks/use-cart'
 import { cartItemKey } from '@/lib/cart-store'
+import { gaBeginCheckout } from '@/lib/gtag'
 import { X, ShoppingBag, Plus, Minus } from 'lucide-react'
 
 export function CartDrawer() {
@@ -31,6 +32,16 @@ export function CartDrawer() {
     if (isNavigating.current || loading) return
     isNavigating.current = true
     setLoading(true)
+    gaBeginCheckout(
+      items.map((i) => ({
+        item_id: i.id,
+        item_name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+        item_variant: i.device_model,
+      })),
+      total()
+    )
     setDrawerOpen(false)
     try {
       router.replace('/checkout')

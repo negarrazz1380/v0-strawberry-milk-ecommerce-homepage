@@ -4,6 +4,8 @@ import { Analytics } from '@vercel/analytics/next'
 import { CartDrawer } from '@/components/cart-drawer'
 import { EmailPopup } from '@/components/EmailPopup'
 import { TiktokPixel } from '@/components/TiktokPixel'
+import Script from 'next/script'
+import { GA_MEASUREMENT_ID } from '@/lib/gtag'
 import './globals.css'
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
@@ -120,7 +122,23 @@ export default function RootLayout({
         {children}
         <CartDrawer />
         <EmailPopup />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_MEASUREMENT_ID}');
+              `}
+            </Script>
+            <Analytics />
+          </>
+        )}
       </body>
     </html>
   )

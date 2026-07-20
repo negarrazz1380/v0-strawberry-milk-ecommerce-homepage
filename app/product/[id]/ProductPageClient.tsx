@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useCart } from '@/hooks/use-cart'
+import { gaViewItem, gaAddToCart } from '@/lib/gtag'
 import { StarRating } from '@/components/star-rating'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -52,6 +53,7 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
       value: product.price,
       currency: 'CAD',
     })
+    gaViewItem({ item_id: product.id, item_name: product.name, price: product.price })
   }, [product.id, product.name, product.price])
 
   return (
@@ -220,6 +222,13 @@ export function ProductPageClient({ product, reviewSummary }: ProductPageClientP
                       content_type: 'product',
                       value: product.price,
                       currency: 'CAD',
+                    })
+                    gaAddToCart({
+                      item_id: product.id,
+                      item_name: product.name,
+                      price: product.price,
+                      item_variant: selectedModel || undefined,
+                      quantity: 1,
                     })
                     setTimeout(() => setAdding(false), 300)
                   }}
