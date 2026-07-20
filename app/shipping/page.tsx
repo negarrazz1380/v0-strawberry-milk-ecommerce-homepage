@@ -3,8 +3,9 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 export const metadata = {
-  title: "Shipping | Case Kiss",
+  title: "Shipping",
   description: "Learn about our shipping policies, timelines, and delivery options.",
+  alternates: { canonical: "/shipping" },
 }
 
 export default function ShippingPage() {

@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/hooks/use-cart'
+import { gaPurchase } from '@/lib/gtag'
 import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
 
@@ -37,6 +38,7 @@ export function SuccessContent() {
       value: total,
       currency: 'CAD',
     })
+    gaPurchase({ transaction_id: orderInfo.order_number, value: total })
   }, [sessionId, orderInfo])
 
   useEffect(() => {

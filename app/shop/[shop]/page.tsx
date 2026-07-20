@@ -20,7 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ shop: str
   const description = descriptions[shop] || 'Cute phone cases for cute prices'
 
   return {
-    title: `${title} - CaseKisses`,
+    title,
+    alternates: { canonical: `https://www.casekisses.com/shop/${shop}` },
     description: description,
     openGraph: {
       title: `${title} - CaseKisses`,

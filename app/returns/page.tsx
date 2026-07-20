@@ -3,8 +3,9 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 export const metadata = {
-  title: "Returns & Store Credit | CaseKisses",
+  title: "Returns & Store Credit",
   description: "Our return policy and store credit options. 14-day returns for approved items.",
+  alternates: { canonical: "/returns" },
 }
 
 export default function ReturnsPage() {

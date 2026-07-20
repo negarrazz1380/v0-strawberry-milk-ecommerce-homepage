@@ -109,7 +109,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     if (!product) {
       return {
-        title: 'Product Not Found | CaseKisses',
+        title: 'Product Not Found',
         description: 'Cute phone cases for cute prices.',
       }
     }
@@ -140,7 +140,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   } catch {
     return {
-      title: 'Product | CaseKisses',
+      title: 'Product',
       description: 'Cute phone cases for cute prices.',
     }
   }

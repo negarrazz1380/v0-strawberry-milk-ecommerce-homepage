@@ -2,8 +2,9 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 
 export const metadata = {
-  title: "Terms of Service | CaseKisses",
+  title: "Terms of Service",
   description: "Our terms of service and conditions of use.",
+  alternates: { canonical: "/terms" },
 }
 
 export default function TermsPage() {
